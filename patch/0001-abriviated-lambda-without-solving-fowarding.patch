@@ -1,0 +1,85 @@
+From 4ef0dfacc944cab369d32e0740c80568ff24e546 Mon Sep 17 00:00:00 2001
+From: Bastien Penavayre <bastienPenava@gmail.com>
+Date: Wed, 16 Aug 2017 21:26:41 +0200
+Subject: [PATCH] abriviated lambda without solving fowarding
+
+[]() => x; //ok
+[]() => X is not []() noexcept(noexcept(X)) -> decltype(X) => X yet
+---
+ gcc/cp/parser.c | 37 ++++++++++++++++++++++++++-----------
+ 1 file changed, 26 insertions(+), 11 deletions(-)
+
+diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
+index 5255e71..6d86a87 100644
+--- a/gcc/cp/parser.c
++++ b/gcc/cp/parser.c
+@@ -10360,6 +10360,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+     tree fco = lambda_function (lambda_expr);
+     tree body;
+     bool done = false;
++    bool is_abriviated = false;
+     tree compound_stmt;
+     tree cap;
+ 
+@@ -10372,7 +10373,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+     start_lambda_scope (fco);
+     body = begin_function_body ();
+ 
+-    if (!cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE))
++    if (cp_lexer_next_token_is (parser->lexer, CPP_EQ) &&
++        cp_lexer_nth_token_is (parser->lexer, 2, CPP_GREATER))
++    {
++        cp_lexer_consume_token (parser->lexer);
++        cp_lexer_consume_token (parser->lexer);
++        is_abriviated = true;
++    }
++    else if (!cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE))
+       goto out;
+ 
+     /* Push the proxies for any explicit captures.  */
+@@ -10397,25 +10405,32 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+        nor a deducible form, errors should be reported for return statements
+        in the body.  Since we used void as the placeholder return type, parsing
+        the body as usual will give such desired behavior.  */
+-    if (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
+-        && cp_lexer_peek_nth_token (parser->lexer, 1)->keyword == RID_RETURN
+-        && cp_lexer_peek_nth_token (parser->lexer, 2)->type != CPP_SEMICOLON)
++    if (is_abriviated ||
++        (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
++         && cp_lexer_peek_nth_token (parser->lexer, 1)->keyword == RID_RETURN
++         && cp_lexer_peek_nth_token (parser->lexer, 2)->type != CPP_SEMICOLON))
+       {
+ 	tree expr = NULL_TREE;
+ 	cp_id_kind idk = CP_ID_KIND_NONE;
+ 
+-	/* Parse tentatively in case there's more after the initial return
+-	   statement.  */
+-	cp_parser_parse_tentatively (parser);
++        if (!is_abriviated)
++        {
++            /* Parse tentatively in case there's more after the initial return
++               statement.  */
++            cp_parser_parse_tentatively (parser);
+ 
+-	cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
++            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
++        }
+ 
+ 	expr = cp_parser_expression (parser, &idk);
+ 
+-	cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
+-	cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
++        if (!is_abriviated)
++        {
++            cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
++            cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
++        }
+ 
+-	if (cp_parser_parse_definitely (parser))
++	if (is_abriviated || cp_parser_parse_definitely (parser))
+ 	  {
+ 	    if (!processing_template_decl)
+ 	      {
+-- 
+2.11.0
+
