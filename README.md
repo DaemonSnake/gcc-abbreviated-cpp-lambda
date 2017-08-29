@@ -10,7 +10,6 @@ The patch aims at implementing the proposal [P0573r0](http://www.open-std.org/jt
 ```c++
 constexpr auto square = [](auto&& x) => x * x;
 constexpr auto t = []<class T>(T&& x)
-         -> decltype(func(std::foward<T>(x))) //expected to be the default, in progress
          => func(std::foward<T>(x));
 ```
 ## How to use
