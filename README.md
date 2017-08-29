@@ -14,4 +14,16 @@ constexpr auto t = []<class T>(T&& x)
 ```
 ## How to use
 
-Download the sources of gcc-7.1.0 [Archive](https://gcc.gnu.org/mirrors.html), apply the patch and build it for your platform.
+Download the sources of gcc-7.1.0 [Archive](https://gcc.gnu.org/mirrors.html), apply the patch and build it for your platform. (git add -A; git commit -am "Init"; git am path/to/patch;)
+
+## Todo
+
+* exception specifications are not yet handled.
+```c++
+constexpr auto f = []() => func();
+static_assert(noexcept(f()) == noexcept(func())); //error here for now
+```
+* throw is allowed as result (good? bad?)
+```c++
+constexpr auto f = []() => throw 0; //works fine, return type is void
+```
