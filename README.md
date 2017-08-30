@@ -29,7 +29,7 @@ int i = 0;
 f(i); //ok
 f(42); //error: cannot bind rvalue reference of type ‘int&&’ to lvalue of type ‘int’
 ```
-solution
+current solution
 ```c++
 constexpr auto f = [](auto&& x) => std::forward<decltype(x)>(x);
 int i = 0;
