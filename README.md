@@ -4,6 +4,9 @@
 A patch for gcc-7.1.0 to implement abdriviated lambdas to C++
 
 The patch aims at implementing the proposal [P0573r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r0.html)
+Currently has:
+* abriviated syntax: []() => ret_expr
+* unary forward operator: >>expr
 
 ## Examples
 
@@ -11,6 +14,7 @@ The patch aims at implementing the proposal [P0573r0](http://www.open-std.org/jt
 constexpr auto square = [](auto&& x) => x * x;
 constexpr auto t = []<class T>(T&& x)
          => func(std::foward<T>(x));
+constexpr auto t_1 = [](auto&& x) => func(>>x);
 ```
 ## How to use
 
@@ -31,7 +35,7 @@ f(42); //error: cannot bind rvalue reference of type ‘int&&’ to lvalue of ty
 ```
 current solution
 ```c++
-constexpr auto f = [](auto&& x) => std::forward<decltype(x)>(x);
+constexpr auto f = [](auto&& x) => >>x; //std::forward<decltype(x)>(x)
 int i = 0;
 f(i); //ok
 f(42); //ok
