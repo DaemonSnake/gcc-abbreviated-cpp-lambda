@@ -20,4 +20,8 @@ int main()
 
     invoke([]<class T>(T&& x)
            => test(std::forward<T>(x)));
+
+    ([](auto&&x) -> std::decay_t<decltype(x)> => x)(42);
+    ([](auto&&x) => std::forward<decltype(x)>(x))(42);
+    // ([](auto&&x) => x)(42); //error
 }

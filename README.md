@@ -18,12 +18,21 @@ Download the sources of gcc-7.1.0 [Archive](https://gcc.gnu.org/mirrors.html), a
 
 ## Todo
 
-* exception specifications are not yet handled.
-```c++
-constexpr auto f = []() => func();
-static_assert(noexcept(f()) == noexcept(func())); //error here for now
-```
 * throw is allowed as result (good? bad?)
 ```c++
 constexpr auto f = []() => throw 0; //works fine, return type is void
+```
+* by using decltype(ret_expr) if ret_exr is a rvalue reference an error occurs (issue?)
+```c++
+constexpr auto f = [](auto&& x) => x;
+int i = 0;
+f(i); //ok
+f(42); //error: cannot bind rvalue reference of type ‘int&&’ to lvalue of type ‘int’
+```
+solution
+```c++
+constexpr auto f = [](auto&& x) => std::forward<decltype(x)>(x);
+int i = 0;
+f(i); //ok
+f(42); //ok
 ```
