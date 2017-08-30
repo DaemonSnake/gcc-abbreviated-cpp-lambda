@@ -5,8 +5,14 @@ A patch for gcc-7.1.0 to implement abdriviated lambdas to C++
 
 The patch aims at implementing the proposal [P0573r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r0.html)
 Currently has:
-* abriviated syntax: []() => ret_expr
-* unary forward operator: >>expr
+* abriviated syntax:
+```c++
+[]() => ret_expr;
+```
+* unary forward operator:
+```c++
+[](auto&&x) => func(>>x);
+```
 
 ## Examples
 
