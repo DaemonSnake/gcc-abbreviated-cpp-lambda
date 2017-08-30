@@ -1,4 +1,5 @@
 #include <functional>
+#include <type_traits>
 
 struct Widget {};
 
@@ -8,20 +9,25 @@ bool test(Widget) { return false; }
 void invoke(std::function<bool(int)>) {}
 void invoke(std::function<bool(std::string)>) {}
 
-struct A
+template <class T>
+constexpr bool is_rvalue_ref(T&&)
 {
-    constexpr int operator*(const A&) const { return 0; }
-};
+    return std::is_rvalue_reference_v<T&&>;
+}
 
 int main()
 {
+    //syntax
     constexpr auto square = []<class T>(T&& x) => x * x;
-    square(A{});
+    static_assert(square(5) == 25);
 
+    //decltype over return expr
     invoke([]<class T>(T&& x)
            => test(std::forward<T>(x)));
 
-    ([](auto&&x) -> std::decay_t<decltype(x)> => x)(42);
-    ([](auto&&x) => std::forward<decltype(x)>(x))(42);
-    // ([](auto&&x) => x)(42); //error
+    //forward operator
+    constexpr auto check = [](auto&&x) => is_rvalue_ref(>>x);
+    static_assert(check(42));
+    int i = 0;
+    static_assert(!check(i));
 }

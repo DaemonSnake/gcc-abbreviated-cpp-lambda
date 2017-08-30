@@ -1,0 +1,31 @@
+From 7f6faa78070341ca5f15f2b057c29fb3bacc1255 Mon Sep 17 00:00:00 2001
+From: Bastien Penavayre <bastienPenava@gmail.com>
+Date: Wed, 30 Aug 2017 21:40:42 +0200
+Subject: [PATCH] implement >> unary operator
+
+---
+ gcc/cp/parser.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
+index a0aa3b7b6..e05f03ebc 100644
+--- a/gcc/cp/parser.c
++++ b/gcc/cp/parser.c
+@@ -7966,6 +7966,14 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
+ 	return cp_parser_delete_expression (parser);
+     }
+ 
++  if (cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
++    {
++        cp_lexer_consume_token (parser->lexer);
++        tree expr = cp_parser_cast_expression (parser, false, false, false, pidk);
++        return build_static_cast (finish_decltype_type (expr, true, tf_warning_or_error),
++                                  expr, tf_warning_or_error);
++    }
++
+   /* Look for a unary operator.  */
+   unary_operator = cp_parser_unary_operator (token);
+   /* The `++' and `--' operators can be handled similarly, even though
+-- 
+2.11.0
+
