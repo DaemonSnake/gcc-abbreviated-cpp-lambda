@@ -24,7 +24,9 @@ constexpr auto t_1 = [](auto&& x) => func(>>x);
 ```
 ## How to use
 
-Download the sources of gcc-7.1.0 [Archive](https://gcc.gnu.org/mirrors.html), apply the patch and build it for your platform. (git add -A; git commit -am "Init"; git am path/to/patch;)
+Download the sources of gcc-7.1.0 [Archive](https://gcc.gnu.org/mirrors.html), apply the patch and build it for your platform. 
+
+git add -A; git commit -am "Init"; git am path/to/patch/*.patch;
 
 ## Todo
 
