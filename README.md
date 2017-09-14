@@ -33,10 +33,6 @@ git init; git add -A; git commit -am "Init"; git am path_to_patches/*.patch;
 
 ## Todo
 
-* throw is allowed as result (good? bad?)
-```c++
-constexpr auto f = []() => throw 0; //works fine, return type is void
-```
 * noexcept(noexcept(ret_expr)) is not yet implemented
 ```c++
 auto f = [](auto&& x) => func(>>x);
