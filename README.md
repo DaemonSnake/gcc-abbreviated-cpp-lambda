@@ -7,14 +7,10 @@ The patch aims at implementing the proposals:
 * lambda abriviated [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
 * Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
-Currently has:
-* abriviated syntax:
+Allowing the following:
 ```c++
-[]() => ret_expr;
-```
-* unary forward operator:
-```c++
-[](auto&&x) => func(>>x);
+[]() => ret_expr; //[]() -> decltype((ret_expr)) { return ret_expr; };
+[](auto&&x) => func(>>x); //func(std::forward<decltype(x)&&>(x))
 ```
 
 ## Examples
