@@ -3,7 +3,10 @@
 ## Description
 A patch for gcc-7.1.0 to implement abdriviated lambdas to C++
 
-The patch aims at implementing the proposal [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
+The patch aims at implementing the proposals:
+* lambda abriviated [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
+* Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
+
 Currently has:
 * abriviated syntax:
 ```c++
