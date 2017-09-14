@@ -16,16 +16,13 @@ Allowing the following:
 };
 ```
 
-## Examples
+## Try It
 
-```c++
-constexpr auto square = [](auto&& x) => x * x;
-constexpr auto t = []<class T>(T&& x)
-         => func(std::foward<T>(x));
-//being equivalent to the following
-constexpr auto t_1 = [](auto&& x) => func(>>x);
-```
-## How to use
+You can try the compiler live [here](http://ec2-52-56-164-249.eu-west-2.compute.amazonaws.com:10240/#).
+
+I'm hosting a ubuntu build of the compiler on a Amazon EC2 server and running [compiler explorer](https://github.com/mattgodbolt/compiler-explorer) on it.
+
+## How to use localy
 
 Simply run make, sit back and wait.
 It will:
@@ -42,8 +39,9 @@ By default gcc is going to be configured with the following options:
 * --disable-shared //doesn't build shared standard library
 Simply remove them from the gcc/build command from Makefile if you want to change the default behavior.
 
-## Todo
-* forward decay-copy capture for lambdas
+## Todo/bugs
+* noexcept(noexcept(ret_expr)) is not fully operational, it causes ICEs in certain cituations.
+* forward decay-copy capture for lambdas.
 ```c++
 int x;
 [>>]() {};
