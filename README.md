@@ -38,3 +38,9 @@ git init; git add -A; git commit -am "Init"; git am path_to_patches/*.patch;
 auto f = [](auto&& x) => func(>>x);
 static_assert(noexcept(f(expr)) == noexcept(func(expr))); //error
 ```
+* forward capture for lambdas
+```c++
+int x;
+[>>]() {};
+//x is perfectly forwarded in the lambda
+```
