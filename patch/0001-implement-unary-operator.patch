@@ -1,14 +1,14 @@
-From 039874c320a5451999f5169188c3f26e1e88492d Mon Sep 17 00:00:00 2001
+From 0a77f7248a84ba74577a863515f11540afe178f2 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 30 Aug 2017 21:40:42 +0200
-Subject: [PATCH 2/2] implement >> unary operator
+Subject: [PATCH 1/2] implement >> unary operator
 
 ---
  gcc/cp/parser.c | 8 ++++++++
  1 file changed, 8 insertions(+)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 1040795a1..68190544b 100644
+index 5255e713a..37711e58e 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -7966,6 +7966,14 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,

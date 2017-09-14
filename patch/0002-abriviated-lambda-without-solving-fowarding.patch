@@ -1,7 +1,7 @@
-From 37477f12ee1440ab11549b67e6b732cd9cc65b1b Mon Sep 17 00:00:00 2001
+From 2fb2e9ef76ac6289fcbb467630a265d14bd2f589 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 16 Aug 2017 21:26:41 +0200
-Subject: [PATCH 1/2] abriviated lambda without solving fowarding
+Subject: [PATCH 2/2] abriviated lambda without solving fowarding
 
 []() => x; //ok
 []() => X is not []() noexcept(noexcept(X)) -> decltype(X) => X yet
@@ -10,10 +10,10 @@ Subject: [PATCH 1/2] abriviated lambda without solving fowarding
  1 file changed, 43 insertions(+), 12 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 5255e713a..1040795a1 100644
+index 37711e58e..68190544b 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
-@@ -10360,6 +10360,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10368,6 +10368,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      tree fco = lambda_function (lambda_expr);
      tree body;
      bool done = false;
@@ -21,7 +21,7 @@ index 5255e713a..1040795a1 100644
      tree compound_stmt;
      tree cap;
  
-@@ -10372,7 +10373,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10380,7 +10381,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      start_lambda_scope (fco);
      body = begin_function_body ();
  
@@ -37,7 +37,7 @@ index 5255e713a..1040795a1 100644
        goto out;
  
      /* Push the proxies for any explicit captures.  */
-@@ -10397,27 +10405,50 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10405,27 +10413,50 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
         nor a deducible form, errors should be reported for return statements
         in the body.  Since we used void as the placeholder return type, parsing
         the body as usual will give such desired behavior.  */
