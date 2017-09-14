@@ -36,7 +36,7 @@ git init; git add -A; git commit -am "Init"; git am path_to_patches/*.patch;
 ```
 
 ## Todo
-* forward capture for lambdas
+* forward decay-copy capture for lambdas
 ```c++
 int x;
 [>>]() {};
