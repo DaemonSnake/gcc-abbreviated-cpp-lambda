@@ -42,7 +42,7 @@ int main()
     static_assert(noexcept(call) == noexcept(expr))
 
     auto c2 = [](auto&& x) => x;
-    auto c3 = [](auto&& x) noexcept(true) => f(>>x); //noexcept(noexcept(ret_expr)) todo
+    auto c3 = [](auto&& x) => f(>>x); //noexcept(noexcept(ret_expr)) todo
     auto c4 = [](auto& x) => x;
     auto c5 = [](auto x) => x;
 
