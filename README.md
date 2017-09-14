@@ -27,13 +27,20 @@ constexpr auto t_1 = [](auto&& x) => func(>>x);
 ```
 ## How to use
 
-Download the sources of gcc-7.2.0 [Archive](https://gcc.gnu.org/mirrors.html), apply the patch and build it for your platform. 
+Simply run make, sit back and wait.
+It will:
+* download gcc-7.2
+* apply the patches
+* configure gcc
+* compile gcc
+* install gcc in $(PWD)/gcc/install/
+* compile test.cpp with the new g++.
 
-```sh
-./apply_patches.sh folder_to_gcc;
-#or
-git init; git add -A; git commit -am "Init"; git am path_to_patches/*.patch;
-```
+By default gcc is going to be configured with the following options:
+* --disable-bootstrap //build gcc using the produced gcc
+* --disable-multilib //cross-compiling
+* --disable-shared //doesn't build shared standard library
+Simply remove them from the gcc/build command from Makefile if you want to change the default behavior.
 
 ## Todo
 * forward decay-copy capture for lambdas
