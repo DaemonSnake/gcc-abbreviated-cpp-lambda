@@ -9,8 +9,11 @@ The patch aims at implementing the proposals:
 
 Allowing the following:
 ```c++
-[]() => ret_expr; //[]() -> decltype((ret_expr)) { return ret_expr; };
-[](auto&&x) => func(>>x); //func(std::forward<decltype(x)&&>(x))
+[](auto&&x) => func(>>x);
+//equivalent to
+[](auto&& x) -> decltype((func(std::forward<decltype(x)&&>(x)))) noexcept(noexcept(func(std::forward<decltype(x)&&>(x)))) {
+    return func(std::forward<decltype(x)&&>(x));
+};
 ```
 
 ## Examples
