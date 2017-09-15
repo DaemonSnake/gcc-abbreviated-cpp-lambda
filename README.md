@@ -1,10 +1,10 @@
-# gcc-abriviated-cpp-lambda
+# gcc-abbreviated-cpp-lambda
 
 ## Description
-A patch for gcc-7.2 (7.1 in branch) to implement abdriviated lambdas to C++
+A patch for gcc-7.2 (7.1 in branch) to implement abbreviated lambdas to C++
 
 The patch aims at implementing the proposals:
-* lambda abriviated [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
+* lambda abbreviated [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
 * Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
 Allowing the following:
@@ -54,4 +54,4 @@ The reason why this patch targets gcc-7.2 more that 7.1 is because the following
 ```c++
 [](auto&& x) noexcept(noexcept(f(x))) { return f(x); };
 ```
-The branch '7.1' therefore doesn't implement the exception specification part of the abriviated lambda proposal
+The branch '7.1' therefore doesn't implement the exception specification part of the abbreviated lambda proposal
