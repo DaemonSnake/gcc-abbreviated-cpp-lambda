@@ -1,10 +1,10 @@
-# gcc-abriviated-cpp-lambda
+# gcc-abbreviated-cpp-lambda
 
 ## Description
-A patch for gcc-7.2 (7.1 in branch) to implement abdriviated lambdas to C++
+A patch for gcc-7.2 (7.1 in branch) to implement abbreviated lambdas to C++
 
 The patch aims at implementing the proposals:
-* lambda abriviated [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
+* "Abbreviated Lambdas for Fun and Profit": [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
 * Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
 Allowing the following:
@@ -33,14 +33,14 @@ It will:
 * install gcc in $(PWD)/gcc/install/
 * compile test.cpp with the new g++.
 
-By default gcc is going to be configured with the following options:
+By default gcc is configured with the following options:
 * --disable-bootstrap //build gcc using the produced gcc
 * --disable-multilib //cross-compiling
 * --disable-shared //doesn't build shared standard library
 Simply remove them from the gcc/build command from Makefile if you want to change the default behavior.
 
 ## Todo/bugs
-* noexcept(noexcept(ret_expr)) is not fully operational, it causes ICEs in certain cituations.
+* noexcept(noexcept(ret_expr)) is not fully operational, it causes ICEs in certain situations.
 * forward decay-copy capture for lambdas.
 ```c++
 int x;
@@ -50,8 +50,8 @@ int x;
 
 ## Note on gcc-7.1
 
-The reason why this patch targets gcc-7.2 more that 7.1 is because the following crashes with gcc-7.1
+The reason why this patch targets gcc-7.2 instead of 7.1 is because the following crashes with gcc-7.1
 ```c++
 [](auto&& x) noexcept(noexcept(f(x))) { return f(x); };
 ```
-The branch '7.1' therefore doesn't implement the exception specification part of the abriviated lambda proposal
+The branch '7.1' therefore doesn't implement the exception specification part of the abbreviated lambda proposal.
