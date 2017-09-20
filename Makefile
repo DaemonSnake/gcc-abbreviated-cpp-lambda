@@ -45,3 +45,9 @@ apply_patches: gcc/build/
 	@for patch in $(ls $(PWD)/patch/*.patch); \
 	do patch -d $(GCC) -p1 < $(PWD)/patch/$(patch); \
 	done;
+
+amazon_update:
+	@cd gcc/ && \
+	rm -f gcc.tar && \
+	tar -cf gcc.tar install/ && \
+	~/.bin/amazon_connect gcc.tar
