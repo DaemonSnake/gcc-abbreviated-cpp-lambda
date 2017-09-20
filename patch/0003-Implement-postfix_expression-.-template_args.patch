@@ -1,15 +1,15 @@
-From 5003e4963b85e45baf799a8ecd7bccbd2ad7f50f Mon Sep 17 00:00:00 2001
+From 5d3dd7ba20c066ffcb85b4ba13450817b5f2279e Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 20 Sep 2017 07:19:01 +0200
 Subject: [PATCH 3/3] Implement postfix_expression ("." | "->")
  <template_args...>
 
 ---
- gcc/cp/parser.c | 74 ++++++++++++++++++++++++++++++++++-----------------------
- 1 file changed, 44 insertions(+), 30 deletions(-)
+ gcc/cp/parser.c | 79 ++++++++++++++++++++++++++++++++++-----------------------
+ 1 file changed, 47 insertions(+), 32 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 1c022996b..2cec69ca7 100644
+index 1c022996b..dc9a56b5f 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -2334,9 +2334,9 @@ static tree cp_parser_template_parameter
@@ -64,7 +64,21 @@ index 1c022996b..2cec69ca7 100644
  {
    tree templ;
    tree arguments;
-@@ -15467,7 +15477,8 @@ cp_parser_template_id (cp_parser *parser,
+@@ -15446,10 +15456,11 @@ cp_parser_template_id (cp_parser *parser,
+ 
+   /* Avoid performing name lookup if there is no possibility of
+      finding a template-id.  */
+-  if ((next_token->type != CPP_NAME && next_token->keyword != RID_OPERATOR)
++  if (identifier_opt == NULL_TREE &&
++      ((next_token->type != CPP_NAME && next_token->keyword != RID_OPERATOR)
+       || (next_token->type == CPP_NAME
+ 	  && !cp_parser_nth_token_starts_template_argument_list_p
+-	       (parser, 2)))
++              (parser, 2))))
+     {
+       cp_parser_error (parser, "expected template-id");
+       return error_mark_node;
+@@ -15467,7 +15478,8 @@ cp_parser_template_id (cp_parser *parser,
  				   check_dependency_p,
  				   is_declaration,
  				   tag_type,
@@ -74,7 +88,7 @@ index 1c022996b..2cec69ca7 100644
    if (templ == error_mark_node || is_identifier)
      {
        pop_deferring_access_checks ();
-@@ -15676,32 +15687,35 @@ cp_parser_template_name (cp_parser* parser,
+@@ -15676,32 +15688,35 @@ cp_parser_template_name (cp_parser* parser,
  			 bool check_dependency_p,
  			 bool is_declaration,
  			 enum tag_types tag_type,
