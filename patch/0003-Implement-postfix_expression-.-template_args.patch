@@ -1,0 +1,134 @@
+From 469e84b1d0ae5fa6c2831040747da882d8df397a Mon Sep 17 00:00:00 2001
+From: Bastien Penavayre <bastienPenava@gmail.com>
+Date: Wed, 20 Sep 2017 07:19:01 +0200
+Subject: [PATCH 3/3] Implement postfix_expression ("." | "->")
+ <template_args...>
+
+---
+ gcc/cp/parser.c | 74 ++++++++++++++++++++++++++++++++++-----------------------
+ 1 file changed, 44 insertions(+), 30 deletions(-)
+
+diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
+index 1c022996b..2cec69ca7 100644
+--- a/gcc/cp/parser.c
++++ b/gcc/cp/parser.c
+@@ -2334,9 +2334,9 @@ static tree cp_parser_template_parameter
+ static tree cp_parser_type_parameter
+   (cp_parser *, bool *);
+ static tree cp_parser_template_id
+-  (cp_parser *, bool, bool, enum tag_types, bool);
++  (cp_parser *, bool, bool, enum tag_types, bool, tree = NULL_TREE);
+ static tree cp_parser_template_name
+-  (cp_parser *, bool, bool, bool, enum tag_types, bool *);
++  (cp_parser *, bool, bool, bool, enum tag_types, bool *, tree = NULL_TREE);
+ static tree cp_parser_template_argument_list
+   (cp_parser *);
+ static tree cp_parser_template_argument
+@@ -7396,13 +7396,22 @@ cp_parser_postfix_dot_deref_expression (cp_parser *parser,
+       bool template_p;
+       cp_token *token = cp_lexer_peek_token (parser->lexer);
+       /* Parse the id-expression.  */
+-      name = (cp_parser_id_expression
+-	      (parser,
+-	       cp_parser_optional_template_keyword (parser),
+-	       /*check_dependency_p=*/true,
+-	       &template_p,
+-	       /*declarator_p=*/false,
+-	       /*optional_p=*/false));
++      if (token->type == CPP_LESS)
++        name = (cp_parser_template_id
++                (parser,
++                 /*template_keyword_p=*/true,
++                 /*check_dependency_p=*/true,
++                 none_type,
++                 /*declarator_p*/false,
++                 /*identifier_opt*/cp_operator_id (CALL_EXPR)));
++      else
++        name = (cp_parser_id_expression
++                (parser,
++                 cp_parser_optional_template_keyword (parser),
++                 /*check_dependency_p=*/true,
++                 &template_p,
++                 /*declarator_p=*/false,
++                 /*optional_p=*/false));
+       /* In general, build a SCOPE_REF if the member name is qualified.
+ 	 However, if the name was not dependent and has already been
+ 	 resolved; there is no need to build the SCOPE_REF.  For example;
+@@ -15426,7 +15435,8 @@ cp_parser_template_id (cp_parser *parser,
+ 		       bool template_keyword_p,
+ 		       bool check_dependency_p,
+ 		       enum tag_types tag_type,
+-		       bool is_declaration)
++		       bool is_declaration,
++		       tree identifier_opt)
+ {
+   tree templ;
+   tree arguments;
+@@ -15467,7 +15477,8 @@ cp_parser_template_id (cp_parser *parser,
+ 				   check_dependency_p,
+ 				   is_declaration,
+ 				   tag_type,
+-				   &is_identifier);
++				   &is_identifier,
++				   identifier_opt);
+   if (templ == error_mark_node || is_identifier)
+     {
+       pop_deferring_access_checks ();
+@@ -15676,32 +15687,35 @@ cp_parser_template_name (cp_parser* parser,
+ 			 bool check_dependency_p,
+ 			 bool is_declaration,
+ 			 enum tag_types tag_type,
+-			 bool *is_identifier)
++			 bool *is_identifier,
++			 tree identifier)
+ {
+-  tree identifier;
+   tree decl;
+   tree fns;
+   cp_token *token = cp_lexer_peek_token (parser->lexer);
+ 
+-  /* If the next token is `operator', then we have either an
+-     operator-function-id or a conversion-function-id.  */
+-  if (cp_lexer_next_token_is_keyword (parser->lexer, RID_OPERATOR))
++  if (identifier == NULL_TREE)
+     {
+-      /* We don't know whether we're looking at an
+-	 operator-function-id or a conversion-function-id.  */
+-      cp_parser_parse_tentatively (parser);
+-      /* Try an operator-function-id.  */
+-      identifier = cp_parser_operator_function_id (parser);
+-      /* If that didn't work, try a conversion-function-id.  */
+-      if (!cp_parser_parse_definitely (parser))
+-	{
+-	  cp_parser_error (parser, "expected template-name");
+-	  return error_mark_node;
+-	}
++      /* If the next token is `operator', then we have either an
++         operator-function-id or a conversion-function-id.  */
++      if (cp_lexer_next_token_is_keyword (parser->lexer, RID_OPERATOR))
++        {
++          /* We don't know whether we're looking at an
++             operator-function-id or a conversion-function-id.  */
++          cp_parser_parse_tentatively (parser);
++          /* Try an operator-function-id.  */
++          identifier = cp_parser_operator_function_id (parser);
++          /* If that didn't work, try a conversion-function-id.  */
++          if (!cp_parser_parse_definitely (parser))
++            {
++              cp_parser_error (parser, "expected template-name");
++              return error_mark_node;
++            }
++        }
++      /* Look for the identifier.  */
++      else
++        identifier = cp_parser_identifier (parser);
+     }
+-  /* Look for the identifier.  */
+-  else
+-    identifier = cp_parser_identifier (parser);
+ 
+   /* If we didn't find an identifier, we don't have a template-id.  */
+   if (identifier == error_mark_node)
+-- 
+2.11.0
+

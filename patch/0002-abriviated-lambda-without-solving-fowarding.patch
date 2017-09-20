@@ -1,16 +1,16 @@
-From 4c7ffa3780f6258d181d776bff4fba8a36abf521 Mon Sep 17 00:00:00 2001
+From f494a80fc14c4532f85bd85d0256caed90cf7d1d Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 16 Aug 2017 21:26:41 +0200
-Subject: [PATCH 2/2] abriviated lambda without solving fowarding
+Subject: [PATCH 2/3] abriviated lambda without solving fowarding
 
 []() => x; //ok
 []() => X is not []() noexcept(noexcept(X)) -> decltype(X) => X yet
 ---
- gcc/cp/parser.c | 59 +++++++++++++++++++++++++++++++++++++++++++++------------
- 1 file changed, 47 insertions(+), 12 deletions(-)
+ gcc/cp/parser.c | 61 +++++++++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 49 insertions(+), 12 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 2a7bc30a8..60d1748e2 100644
+index 2a7bc30a8..1c022996b 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -10377,6 +10377,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
@@ -37,7 +37,7 @@ index 2a7bc30a8..60d1748e2 100644
        goto out;
  
      /* Push the proxies for any explicit captures.  */
-@@ -10414,27 +10422,54 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10414,29 +10422,58 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
         nor a deducible form, errors should be reported for return statements
         in the body.  Since we used void as the placeholder return type, parsing
         the body as usual will give such desired behavior.  */
@@ -78,31 +78,35 @@ index 2a7bc30a8..60d1748e2 100644
 -	if (cp_parser_parse_definitely (parser))
 +	if (is_abriviated || cp_parser_parse_definitely (parser))
  	  {
--	    if (!processing_template_decl)
-+            if (is_abriviated && !LAMBDA_EXPR_RETURN_TYPE (lambda_expr))
-+              {
-+                tree type = finish_decltype_type (expr, true, tf_warning_or_error);
-+                if (REFERENCE_REF_P (expr) ||
-+                    (TREE_TYPE (expr) && TREE_CODE (TREE_TYPE (expr)) == REFERENCE_TYPE))
-+                  {
-+                    tree ref = expr;
-+                    while (REFERENCE_REF_P (ref))
-+                      ref = TREE_OPERAND (ref, 0);
-+                    if (TYPE_REF_IS_RVALUE (TREE_TYPE (ref)))
-+                        type = lambda_return_type (expr);
-+                  }
-+                apply_deduced_return_type (fco, type);
-+                tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
-+                tree raises = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
-+                TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fco)) = raises;
-+
-+                if (type == error_mark_node)
-+                  expr = error_mark_node;
-+              }
-+	    else if (!processing_template_decl)
+ 	    if (!processing_template_decl)
  	      {
- 		tree type = lambda_return_type (expr);
+-		tree type = lambda_return_type (expr);
++                tree type = NULL_TREE;
++
++                if (is_abriviated && !LAMBDA_EXPR_RETURN_TYPE (lambda_expr))
++                  {
++                    type = finish_decltype_type (expr, true, tf_warning_or_error);
++                    if (REFERENCE_REF_P (expr) ||
++                        (TREE_TYPE (expr) && TREE_CODE (TREE_TYPE (expr)) == REFERENCE_TYPE))
++                      {
++                        tree ref = expr;
++                        while (REFERENCE_REF_P (ref))
++                            ref = TREE_OPERAND (ref, 0);
++                        if (TYPE_REF_IS_RVALUE (TREE_TYPE (ref)))
++                            type = lambda_return_type (expr);
++                      }
++                    // tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
++                    // tree raises = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
++                    // if (processing_template_decl)
++                    //     TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fco)) = raises;
++                    // else
++                    //     //???
++                  }
++		else
++                  type = lambda_return_type (expr);
  		apply_deduced_return_type (fco, type);
+ 		if (type == error_mark_node)
+ 		  expr = error_mark_node;
 -- 
 2.11.0
 
