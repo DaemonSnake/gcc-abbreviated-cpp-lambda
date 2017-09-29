@@ -1,21 +1,22 @@
 #include <functional>
 #include <type_traits>
 
-struct Widget {};
+struct Widget
+{
+    int i = 0;
+    constexpr Widget() : i(0) => 42;
+};
 
-bool test(int) { return true; }
-bool test(Widget) { return false; }
+bool test(int) => true;
+bool test(Widget) => false;
 
 void invoke(std::function<bool(int)>) {}
 void invoke(std::function<bool(std::string)>) {}
 
 template <class T>
-constexpr bool is_rvalue_ref(T&&)
-{
-    return std::is_rvalue_reference_v<T&&>;
-}
+constexpr bool is_rvalue_ref(T&&) => std::is_rvalue_reference_v<T&&>;
 
-int&& f(int&& x) noexcept(true) { return >>x; }
+int&& f(int&& x) noexcept(true) => >>x;
 
 int main()
 {
@@ -42,7 +43,7 @@ int main()
     static_assert(noexcept(call) == noexcept(expr))
 
     auto c2 = [](auto&& x) => x;
-    auto c3 = [](auto&& x) => f(>>x); //noexcept(noexcept(ret_expr)) todo
+    auto c3 = [](auto&& x) noexcept(true) => f(>>x); //noexcept(noexcept(ret_expr)) todo
     auto c4 = [](auto& x) => x;
     auto c5 = [](auto x) => x;
 

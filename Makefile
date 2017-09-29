@@ -36,7 +36,7 @@ gcc/build: gcc/gcc-7.2.0/
 	$(GCC)/configure --prefix=$(ROOT)/install/ \
 		--disable-bootstrap --disable-multilib --disable-shared --enable-languages=c++;
 
-rebuild: apply_patches
+rebuild: gcc/build
 	@echo "$(RED)building gcc...$(NC)";
 	@cd gcc/build && $(MAKE) -j$(NPROC) && $(MAKE) install -j$(NPROC);
 

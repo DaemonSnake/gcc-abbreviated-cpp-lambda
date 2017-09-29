@@ -1,0 +1,231 @@
+From 7fc55b7b8104aa192f679964443fb6a0bd9bdcad Mon Sep 17 00:00:00 2001
+From: Bastien Penavayre <bastienPenava@gmail.com>
+Date: Wed, 16 Aug 2017 21:26:41 +0200
+Subject: [PATCH 2/2] abbreviated lambda without solving fowarding
+
+This patch adds the following:
+- adds the token_type CPP_EQ_GREATER :
+        '=>' (libcpp/lex.c & libcpp/include/cpplib.h)
+- implements the abbreviated syntax for lambdas and functions :
+        int main() => 42; []() => 42; ...
+- implements for abbreviated lambda return type specification :
+        [](auto&& x) -> decltype((x)) { return x; } being equivalent to [](auto&& x) => x
+
+It doesn't yet:
+
+- implements the noexcept specification over abbreviated lambdas :
+        noexcept(noexcept(return_expr))
+- implements return type specification and noexcept specification over functions
+        auto func(auto&& x) => x; is not yet equivalent to auto func(auto&& x) noexcept(noexcept(x)) -> decltype((x)) { return x; };
+
+Signed-off-by: Bastien Penavayre <bastienPenava@gmail.com>
+---
+ gcc/cp/parser.c         | 113 +++++++++++++++++++++++++++++++++++-------------
+ libcpp/include/cpplib.h |   3 +-
+ libcpp/lex.c            |   9 +++-
+ 3 files changed, 93 insertions(+), 32 deletions(-)
+
+diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
+index 2a7bc30a8..e03782e8c 100644
+--- a/gcc/cp/parser.c
++++ b/gcc/cp/parser.c
+@@ -10377,6 +10377,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+     tree fco = lambda_function (lambda_expr);
+     tree body;
+     bool done = false;
++    bool is_abriviated = false;
+     tree compound_stmt;
+     tree cap;
+ 
+@@ -10389,7 +10390,12 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+     start_lambda_scope (fco);
+     body = begin_function_body ();
+ 
+-    if (!cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE))
++    if (cp_lexer_next_token_is (parser->lexer, CPP_EQ_GREATER))
++      {
++        cp_lexer_consume_token (parser->lexer);
++        is_abriviated = true;
++      }
++    else if (!cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE))
+       goto out;
+ 
+     /* Push the proxies for any explicit captures.  */
+@@ -10414,39 +10420,73 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+        nor a deducible form, errors should be reported for return statements
+        in the body.  Since we used void as the placeholder return type, parsing
+        the body as usual will give such desired behavior.  */
+-    if (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
+-        && cp_lexer_peek_nth_token (parser->lexer, 1)->keyword == RID_RETURN
+-        && cp_lexer_peek_nth_token (parser->lexer, 2)->type != CPP_SEMICOLON)
++    if (is_abriviated ||
++        (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
++         && cp_lexer_peek_nth_token (parser->lexer, 1)->keyword == RID_RETURN
++         && cp_lexer_peek_nth_token (parser->lexer, 2)->type != CPP_SEMICOLON))
+       {
+ 	tree expr = NULL_TREE;
+ 	cp_id_kind idk = CP_ID_KIND_NONE;
+ 
+-	/* Parse tentatively in case there's more after the initial return
+-	   statement.  */
+-	cp_parser_parse_tentatively (parser);
+-
+-	cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
++        if (!is_abriviated)
++          {
++            /* Parse tentatively in case there's more after the initial return
++               statement.  */
++            cp_parser_parse_tentatively (parser);
+ 
+-	expr = cp_parser_expression (parser, &idk);
++            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
+ 
+-	cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
+-	cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
+-
+-	if (cp_parser_parse_definitely (parser))
+-	  {
+-	    if (!processing_template_decl)
+-	      {
+-		tree type = lambda_return_type (expr);
+-		apply_deduced_return_type (fco, type);
+-		if (type == error_mark_node)
+-		  expr = error_mark_node;
+-	      }
++            expr = cp_parser_expression (parser, &idk);
+ 
+-	    /* Will get error here if type not deduced yet.  */
+-	    finish_return_stmt (expr);
++            cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
++            cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
+ 
+-	    done = true;
+-	  }
++            if (cp_parser_parse_definitely (parser))
++              {
++                if (!processing_template_decl)
++                  {
++                    tree type = lambda_return_type (expr);
++                    apply_deduced_return_type (fco, type);
++                    if (type == error_mark_node)
++                      expr = error_mark_node;
++                  }
++
++                /* Will get error here if type not deduced yet.  */
++                finish_return_stmt (expr);
++
++                done = true;
++              }
++          }
++        else
++         {
++           expr = cp_parser_assignment_expression (parser, &idk);
++           if (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr))
++             {
++               tree type = NULL_TREE;
++               if (REFERENCE_REF_P (expr)
++                   || (TREE_TYPE (expr) && TREE_CODE (TREE_TYPE (expr)) == REFERENCE_TYPE))
++                 {
++                   tree ref = expr;
++                   while (REFERENCE_REF_P (ref))
++                     ref = TREE_OPERAND (ref, 0);
++                   if (TYPE_REF_IS_RVALUE (TREE_TYPE (ref)))
++                     type = lambda_return_type (expr);
++                 }
++               if (!type)
++                 type = finish_decltype_type (expr, true, tf_warning_or_error);
++               LAMBDA_EXPR_RETURN_TYPE (lambda_expr) = type;
++               apply_deduced_return_type (fco, type);
++               if (type == error_mark_node)
++                 expr = error_mark_node;
++             }
++           // how to change DEFERRED_NOEXCEPT_SPEC_P (fco) ?
++           // tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
++           // tree raises = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
++           // TREE_TYPE (fco) = build_exception_variant (TREE_TYPE (fco), raises);
++           // TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fco)) = raises;
++           finish_return_stmt (expr);
++           done = true;
++         }
+       }
+ 
+     if (!done)
+@@ -21460,9 +21500,20 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
+ static void
+ cp_parser_function_body (cp_parser *parser, bool in_function_try_block)
+ {
+-  cp_parser_compound_statement (parser, NULL, (in_function_try_block
+-					       ? BCS_TRY_BLOCK : BCS_NORMAL),
+-				true);
++  if (!in_function_try_block
++      && cp_lexer_next_token_is (parser->lexer, CPP_EQ_GREATER))
++    {
++      cp_lexer_consume_token (parser->lexer);
++      tree compound_stmt = begin_compound_stmt (0);
++      cp_id_kind idk = CP_ID_KIND_NONE;
++      tree expr = cp_parser_assignment_expression (parser, &idk);
++      finish_return_stmt (expr);
++      finish_compound_stmt (compound_stmt);
++    }
++  else
++    cp_parser_compound_statement (parser, NULL, (in_function_try_block
++                                                 ? BCS_TRY_BLOCK : BCS_NORMAL),
++                                  true);
+ }
+ 
+ /* Parse a ctor-initializer-opt followed by a function-body.  Return
+@@ -28065,7 +28116,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+ 	  || token->keyword == RID_TRANSACTION_ATOMIC
+ 	  || token->keyword == RID_TRANSACTION_RELAXED
+ 	  /* The named return value extension begins with `return'.  */
+-	  || token->keyword == RID_RETURN);
++	  || token->keyword == RID_RETURN
++         /* A single assignement-expression return body '=>' */
++         || token->type == CPP_EQ_GREATER);
+ }
+ 
+ /* Returns TRUE iff the next token is the ":" or "{" beginning a class
+diff --git a/libcpp/include/cpplib.h b/libcpp/include/cpplib.h
+index b843992b0..c4cb9697f 100644
+--- a/libcpp/include/cpplib.h
++++ b/libcpp/include/cpplib.h
+@@ -146,7 +146,8 @@ struct _cpp_file;
+   TK(MACRO_ARG,		NONE)	 /* Macro argument.  */			\
+   TK(PRAGMA,		NONE)	 /* Only for deferred pragmas.  */	\
+   TK(PRAGMA_EOL,	NONE)	 /* End-of-line for deferred pragmas.  */ \
+-  TK(PADDING,		NONE)	 /* Whitespace for -E.	*/
++  TK(PADDING,		NONE)	 /* Whitespace for -E.	*/		\
++  OP(EQ_GREATER,	"=>")
+ 
+ #define OP(e, s) CPP_ ## e,
+ #define TK(e, s) CPP_ ## e,
+diff --git a/libcpp/lex.c b/libcpp/lex.c
+index 9edd2a6af..89044fa5f 100644
+--- a/libcpp/lex.c
++++ b/libcpp/lex.c
+@@ -3047,7 +3047,13 @@ _cpp_lex_direct (cpp_reader *pfile)
+       break;
+ 
+     case '*': IF_NEXT_IS ('=', CPP_MULT_EQ, CPP_MULT); break;
+-    case '=': IF_NEXT_IS ('=', CPP_EQ_EQ, CPP_EQ); break;
++    case '=':
++	result->type = CPP_EQ;
++	if (*buffer->cur == '=')
++	    buffer->cur++, result->type = CPP_EQ_EQ;
++	else if (*buffer->cur == '>')
++	    buffer->cur++, result->type = CPP_EQ_GREATER;
++	break;
+     case '!': IF_NEXT_IS ('=', CPP_NOT_EQ, CPP_NOT); break;
+     case '^': IF_NEXT_IS ('=', CPP_XOR_EQ, CPP_XOR); break;
+     case '#': IF_NEXT_IS ('#', CPP_PASTE, CPP_HASH); result->val.token_no = 0; break;
+@@ -3424,6 +3430,7 @@ cpp_avoid_paste (cpp_reader *pfile, const cpp_token *token1,
+ 				    || (TOKEN_SPELL (token2) == SPELL_LITERAL
+ 					&& ISIDST (token2->val.str.text[0]))));
+ 
++    case CPP_EQ_GREATER: return (a == '=' && b == '>');
+     default:		break;
+     }
+ 
+-- 
+2.11.0
+
