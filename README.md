@@ -7,18 +7,25 @@ The patch aims at implementing the proposals:
 * "Abbreviated Lambdas for Fun and Profit": [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
 * Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
-Allowing the following:
+## Implementation status:
+* adds an abbreviated sytax for lambdas and function [OK]
+* uses decltype\(\(ret_expr\)\) as deduced return type when used [lambdas:OK]
+* uses noexcept(noexcept(ret_expr)) as deduced exception specification [KO]
+
+## Example
 ```c++
 [](auto&&x) => func(>>x);
-//equivalent to
+//will be equivalent to
 [](auto&& x) -> decltype((func(std::forward<decltype(x)&&>(x)))) noexcept(noexcept(func(std::forward<decltype(x)&&>(x)))) {
-    return func(std::forward<decltype(x)&&>(x));
+    return func(std::forward<decltype(x)&&>(x));    
 };
+template<class T>
+constexpr auto f(T&& x) => x; //allowed with functions too
 ```
 
 ## Try It
 
-You can try the compiler live [here](http://ec2-52-56-164-249.eu-west-2.compute.amazonaws.com:10240/#).
+You can try the compiler live [here](http://www.gcc-abbreviated-lambdas-proposal.tk/).
 
 I'm hosting a ubuntu build of the compiler on a Amazon EC2 server and running [compiler explorer](https://github.com/mattgodbolt/compiler-explorer) on it.
 
