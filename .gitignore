@@ -1,3 +1,5 @@
 g++
 gcc/
 Makefile
+TODO
+.gitignore
