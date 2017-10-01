@@ -9,7 +9,7 @@ The patch aims at implementing the proposals:
 
 ## Implementation status:
 * adds an abbreviated sytax for lambdas and function [OK]
-* uses decltype\(\(ret_expr\)\) as deduced return type when used [lambdas:OK]
+* uses decltype\(\(ret_expr\)\) as deduced return type when used [OK]
 * uses noexcept(noexcept(ret_expr)) as deduced exception specification [KO]
 
 ## Example
