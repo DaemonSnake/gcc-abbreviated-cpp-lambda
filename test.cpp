@@ -1,22 +1,20 @@
 #include <functional>
 #include <type_traits>
 
-struct Widget
-{
-    int i = 0;
-    constexpr Widget() : i(0) => 42;
-};
+void check_return_type_are_correct();
+void check_forward();
+void check_raii();
 
+struct Widget {};
 bool test(int) => true;
 bool test(Widget) => false;
-
 void invoke(std::function<bool(int)>) {}
 void invoke(std::function<bool(std::string)>) {}
 
 template <class T>
 constexpr bool is_rvalue_ref(T&&) => std::is_rvalue_reference_v<T&&>;
 
-int&& f(int&& x) noexcept(true) => >>x;
+int&& f(int&& x) noexcept(true) => (>>x);
 
 int main()
 {
@@ -25,10 +23,20 @@ int main()
     square(5);
     static_assert(square(5) == 25);
 
-    invoke([]<class T>(T&& x)
-           => test(std::forward<T>(x)));
+    check_raii();
+    check_forward();
+    check_return_type_are_correct();
+}
 
-    //unary operator >> : perfect forwarding
+void check_raii()
+{
+    invoke([]<class T>(T&& x) => test(std::forward<T>(x)));
+    // the normal version would cause an error:
+    // invoke([]<class T>(T&& x) { return test(std::forward<T>(x)); });
+}
+
+void check_forward()
+{
     constexpr auto check = [](auto&&x) => is_rvalue_ref(>>x);
     int i = 0;
 
@@ -36,19 +44,51 @@ int main()
     check(i);
     static_assert(check(42));
     static_assert(!check(i));
+    check_return_type_are_correct();
+}
 
-#define TEST_TYPE_EXCEPT(name, call, return, expr)              \
-    call;                                                       \
-    static_assert(std::is_same_v<decltype(call), return>);      \
-    static_assert(noexcept(call) == noexcept(expr))
+template<class T> constexpr auto func_1(T&& x) => (>>x);
+template<class T> constexpr auto func_2(T&& x) -> decltype((>>x)) => (>>x);
+template<class T> constexpr auto func_3(T&& x) => (x);
+template<class T> constexpr auto func_4(T&& x) -> decltype((x)) => (x);
 
-    auto c2 = [](auto&& x) => x;
-    auto c3 = [](auto&& x) noexcept(true) => f(>>x); //noexcept(noexcept(ret_expr)) todo
-    auto c4 = [](auto& x) => x;
-    auto c5 = [](auto x) => x;
+void check_return_type_are_correct()
+{
+    int i = 0, &&v = 0;
 
-    TEST_TYPE_EXCEPT(c2, c2(5), int, 5);
-    TEST_TYPE_EXCEPT(c3, c3(5), int&&, f(5));
-    TEST_TYPE_EXCEPT(c4, c4(i), int&, i);
-    TEST_TYPE_EXCEPT(c5, c5(5), int, 5);
+    constexpr auto make_is_same = []<class L, class R>(L&&, R&&) {
+        static_assert(std::is_same_v<L, R>);
+    };
+    constexpr auto lambda_1 = []<class T>(T&& x) => (>>x);
+    constexpr auto lambda_2 = []<class T>(T&& x) -> decltype((>>x)) => (>>x);
+    constexpr auto lambda_3 = []<class T>(T&& x) => (x);
+    constexpr auto lambda_4 = []<class T>(T&& x) -> decltype((x)) => (x);
+
+#define SAME_F(funcA, funcB, args...)           \
+    make_is_same(funcA(args), funcB(args))
+
+
+    SAME_F(lambda_1, lambda_2, 42);
+    SAME_F(lambda_1, lambda_2, i);
+    SAME_F(lambda_1, lambda_2, v);
+    SAME_F(lambda_1, lambda_2, >>i);
+    SAME_F(lambda_1, lambda_2, >>v);
+
+    SAME_F(lambda_3, lambda_4, 42);
+    SAME_F(lambda_3, lambda_4, i);
+    SAME_F(lambda_3, lambda_4, v);
+    SAME_F(lambda_3, lambda_4, >>i);
+    SAME_F(lambda_3, lambda_4, >>v);
+
+    SAME_F(func_1, func_2, 42);
+    SAME_F(func_1, func_2, i);
+    SAME_F(func_1, func_2, v);
+    SAME_F(func_1, func_2, >>i);
+    SAME_F(func_1, func_2, >>v);
+
+    SAME_F(func_3, func_4, 42);
+    SAME_F(func_3, func_4, i);
+    SAME_F(func_3, func_4, v);
+    SAME_F(func_3, func_4, >>i);
+    SAME_F(func_3, func_4, >>v);
 }

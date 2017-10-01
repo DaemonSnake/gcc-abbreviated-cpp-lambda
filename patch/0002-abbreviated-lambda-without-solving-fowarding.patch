@@ -1,4 +1,4 @@
-From 7fc55b7b8104aa192f679964443fb6a0bd9bdcad Mon Sep 17 00:00:00 2001
+From 52eecdad65d0f37d1a254daeb7169d65c678e0b4 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 16 Aug 2017 21:26:41 +0200
 Subject: [PATCH 2/2] abbreviated lambda without solving fowarding
@@ -8,28 +8,29 @@ This patch adds the following:
         '=>' (libcpp/lex.c & libcpp/include/cpplib.h)
 - implements the abbreviated syntax for lambdas and functions :
         int main() => 42; []() => 42; ...
-- implements for abbreviated lambda return type specification :
-        [](auto&& x) -> decltype((x)) { return x; } being equivalent to [](auto&& x) => x
+- implements the return type specification for abbreviated lambda and functions :
+        '[](auto&& x) -> decltype((x)) { return x; }' being equivalent to '[](auto&& x) => x'
+        'auto func(auto&& x) -> decltype((x)) { return x; }' being equivalent to 'auto func(auto&&x) => x'
 
 It doesn't yet:
 
 - implements the noexcept specification over abbreviated lambdas :
         noexcept(noexcept(return_expr))
-- implements return type specification and noexcept specification over functions
-        auto func(auto&& x) => x; is not yet equivalent to auto func(auto&& x) noexcept(noexcept(x)) -> decltype((x)) { return x; };
+- implements the noexcept specification over functions :
+        auto func(auto&& x) => x; is not yet equivalent to auto func(auto&& x) noexcept(noexcept(x)) => x;
 
 Signed-off-by: Bastien Penavayre <bastienPenava@gmail.com>
 ---
- gcc/cp/parser.c         | 113 +++++++++++++++++++++++++++++++++++-------------
+ gcc/cp/parser.c         | 119 ++++++++++++++++++++++++++++++++++++------------
  libcpp/include/cpplib.h |   3 +-
  libcpp/lex.c            |   9 +++-
- 3 files changed, 93 insertions(+), 32 deletions(-)
+ 3 files changed, 99 insertions(+), 32 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 2a7bc30a8..e03782e8c 100644
+index 9c912575a..f1eef5c34 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
-@@ -10377,6 +10377,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10378,6 +10378,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      tree fco = lambda_function (lambda_expr);
      tree body;
      bool done = false;
@@ -37,7 +38,7 @@ index 2a7bc30a8..e03782e8c 100644
      tree compound_stmt;
      tree cap;
  
-@@ -10389,7 +10390,12 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10390,7 +10391,12 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      start_lambda_scope (fco);
      body = begin_function_body ();
  
@@ -51,7 +52,7 @@ index 2a7bc30a8..e03782e8c 100644
        goto out;
  
      /* Push the proxies for any explicit captures.  */
-@@ -10414,39 +10420,73 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10415,39 +10421,65 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
         nor a deducible form, errors should be reported for return statements
         in the body.  Since we used void as the placeholder return type, parsing
         the body as usual will give such desired behavior.  */
@@ -71,18 +72,18 @@ index 2a7bc30a8..e03782e8c 100644
 -	cp_parser_parse_tentatively (parser);
 -
 -	cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
+-
+-	expr = cp_parser_expression (parser, &idk);
 +        if (!is_abriviated)
 +          {
 +            /* Parse tentatively in case there's more after the initial return
 +               statement.  */
 +            cp_parser_parse_tentatively (parser);
  
--	expr = cp_parser_expression (parser, &idk);
-+            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
- 
 -	cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
 -	cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
--
++            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
+ 
 -	if (cp_parser_parse_definitely (parser))
 -	  {
 -	    if (!processing_template_decl)
@@ -122,18 +123,10 @@ index 2a7bc30a8..e03782e8c 100644
 +           expr = cp_parser_assignment_expression (parser, &idk);
 +           if (!LAMBDA_EXPR_RETURN_TYPE (lambda_expr))
 +             {
-+               tree type = NULL_TREE;
-+               if (REFERENCE_REF_P (expr)
-+                   || (TREE_TYPE (expr) && TREE_CODE (TREE_TYPE (expr)) == REFERENCE_TYPE))
-+                 {
-+                   tree ref = expr;
-+                   while (REFERENCE_REF_P (ref))
-+                     ref = TREE_OPERAND (ref, 0);
-+                   if (TYPE_REF_IS_RVALUE (TREE_TYPE (ref)))
-+                     type = lambda_return_type (expr);
-+                 }
-+               if (!type)
-+                 type = finish_decltype_type (expr, true, tf_warning_or_error);
++               tree type = finish_decltype_type
++                   (expr,
++                    /*id_expression_or_member_access_p*/false,
++                    tf_warning_or_error);
 +               LAMBDA_EXPR_RETURN_TYPE (lambda_expr) = type;
 +               apply_deduced_return_type (fco, type);
 +               if (type == error_mark_node)
@@ -150,7 +143,7 @@ index 2a7bc30a8..e03782e8c 100644
        }
  
      if (!done)
-@@ -21460,9 +21500,20 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
+@@ -21461,9 +21493,34 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
  static void
  cp_parser_function_body (cp_parser *parser, bool in_function_try_block)
  {
@@ -164,6 +157,20 @@ index 2a7bc30a8..e03782e8c 100644
 +      tree compound_stmt = begin_compound_stmt (0);
 +      cp_id_kind idk = CP_ID_KIND_NONE;
 +      tree expr = cp_parser_assignment_expression (parser, &idk);
++      tree fco = current_function_decl;
++      tree fntype = TREE_TYPE (fco);
++      tree fn_ret = TREE_TYPE (fntype);
++      if (type_uses_auto (fn_ret)
++          && is_auto (fn_ret)
++          && !TYPE_HAS_LATE_RETURN_TYPE (fntype))
++        {
++          tree type = finish_decltype_type
++              (expr,
++               /*id_expression_or_member_access_p*/false,
++               tf_warning_or_error);
++          if (type != error_mark_node)
++            apply_deduced_return_type (fco, type);
++        }
 +      finish_return_stmt (expr);
 +      finish_compound_stmt (compound_stmt);
 +    }
@@ -174,7 +181,7 @@ index 2a7bc30a8..e03782e8c 100644
  }
  
  /* Parse a ctor-initializer-opt followed by a function-body.  Return
-@@ -28065,7 +28116,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+@@ -28066,7 +28123,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
  	  || token->keyword == RID_TRANSACTION_ATOMIC
  	  || token->keyword == RID_TRANSACTION_RELAXED
  	  /* The named return value extension begins with `return'.  */

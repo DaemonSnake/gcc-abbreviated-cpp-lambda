@@ -1,20 +1,21 @@
-From 1977d7776599d7e1d774c67f45874cc959e34dc2 Mon Sep 17 00:00:00 2001
+From 087f98daf3358c1921086eed0923234ba1a0a3c0 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 30 Aug 2017 21:40:42 +0200
 Subject: [PATCH 1/2] implement >> unary operator
 
 ---
- gcc/cp/parser.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ gcc/cp/parser.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 79aea4a29..2a7bc30a8 100644
+index 79aea4a29..9c912575a 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
-@@ -7971,6 +7971,14 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
+@@ -7971,6 +7971,15 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
  	return cp_parser_delete_expression (parser);
      }
  
++  /* unary >> forward cast operator */
 +  if (cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
 +    {
 +        cp_lexer_consume_token (parser->lexer);
