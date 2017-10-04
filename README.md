@@ -23,6 +23,7 @@ The patch aims at implementing the proposals:
 {
     return func(std::forward<decltype(x)&&>(x));    
 };
+
 template<class T>
 constexpr auto f(T&& x) => x; //allowed with functions too
 ```
