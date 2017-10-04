@@ -4,8 +4,8 @@
 A patch for gcc-7.2 (7.1 in branch) to implement abbreviated lambdas to C++
 
 The patch aims at implementing the proposals:
-* "Abbreviated Lambdas for Fun and Profit": [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
-* Forward without forward [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
+* Abbreviated Lambdas for Fun and Profit: [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
+* Forward without forward: [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
 ## Implementation status:
 * adds an abbreviated sytax for lambdas and function [OK]
@@ -53,9 +53,9 @@ Simply remove them from the gcc/build command from Makefile if you want to chang
 
 ## Todo/bugs
 * noexcept(noexcept(ret_expr)) is not functional yet.
-* forward decay-copy capture for lambdas.
+* variadic parameter with omitted type not functional
 ```c++
-int x;
-[>>]() {};
-//x is perfectly forwarded in the lambda
+[](x...) {};
+//means, for now
+[](auto&& x, ...) {}
 ```
