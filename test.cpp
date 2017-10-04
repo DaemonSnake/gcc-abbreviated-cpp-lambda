@@ -44,7 +44,16 @@ void check_forward()
     check(i);
     static_assert(check(42));
     static_assert(!check(i));
-    check_return_type_are_correct();
+}
+
+void check_optional_type_for_parameter()
+{
+    auto sqrt = [](x) => x * x;
+    static_assert(sqrt(42) == 42 * 42);
+    [](x)
+    {
+        static_assert(std::is_rvalue_reference_v<decltype(x)>);
+    }(42);
 }
 
 template<class T> constexpr auto func_1(T&& x) => (>>x);
@@ -66,7 +75,6 @@ void check_return_type_are_correct()
 
 #define SAME_F(funcA, funcB, args...)           \
     make_is_same(funcA(args), funcB(args))
-
 
     SAME_F(lambda_1, lambda_2, 42);
     SAME_F(lambda_1, lambda_2, i);

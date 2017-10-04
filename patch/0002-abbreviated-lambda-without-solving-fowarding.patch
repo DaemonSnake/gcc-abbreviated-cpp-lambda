@@ -1,4 +1,4 @@
-From 52eecdad65d0f37d1a254daeb7169d65c678e0b4 Mon Sep 17 00:00:00 2001
+From 41d70fff080a2dd5604ab613a304b8b85519af02 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 16 Aug 2017 21:26:41 +0200
 Subject: [PATCH 2/2] abbreviated lambda without solving fowarding
@@ -11,6 +11,8 @@ This patch adds the following:
 - implements the return type specification for abbreviated lambda and functions :
         '[](auto&& x) -> decltype((x)) { return x; }' being equivalent to '[](auto&& x) => x'
         'auto func(auto&& x) -> decltype((x)) { return x; }' being equivalent to 'auto func(auto&&x) => x'
+- implements optional parameter type for lambdas :
+        '[](x) {}' being equivalent to '[](auto&& x) {}'
 
 It doesn't yet:
 
@@ -21,15 +23,29 @@ It doesn't yet:
 
 Signed-off-by: Bastien Penavayre <bastienPenava@gmail.com>
 ---
- gcc/cp/parser.c         | 119 ++++++++++++++++++++++++++++++++++++------------
+ gcc/cp/parser.c         | 201 +++++++++++++++++++++++++++++++++++-------------
  libcpp/include/cpplib.h |   3 +-
- libcpp/lex.c            |   9 +++-
- 3 files changed, 99 insertions(+), 32 deletions(-)
+ libcpp/lex.c            |   9 ++-
+ 3 files changed, 158 insertions(+), 55 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 9c912575a..f1eef5c34 100644
+index 9c912575a..243dc46e5 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
+@@ -2209,11 +2209,11 @@ static tree cp_parser_init_declarator
+   (cp_parser *, cp_decl_specifier_seq *, vec<deferred_access_check, va_gc> *,
+    bool, bool, int, bool *, tree *, location_t *, tree *);
+ static cp_declarator *cp_parser_declarator
+-  (cp_parser *, cp_parser_declarator_kind, int *, bool *, bool, bool);
++  (cp_parser *, cp_parser_declarator_kind, int *, bool *, bool, bool, enum tree_code = ERROR_MARK);
+ static cp_declarator *cp_parser_direct_declarator
+   (cp_parser *, cp_parser_declarator_kind, int *, bool, bool);
+ static enum tree_code cp_parser_ptr_operator
+-  (cp_parser *, tree *, cp_cv_quals *, tree *);
++  (cp_parser *, tree *, cp_cv_quals *, tree *, enum tree_code = ERROR_MARK);
+ static cp_cv_quals cp_parser_cv_qualifier_seq_opt
+   (cp_parser *);
+ static cp_virt_specifiers cp_parser_virt_specifier_seq_opt
 @@ -10378,6 +10378,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      tree fco = lambda_function (lambda_expr);
      tree body;
@@ -143,7 +159,151 @@ index 9c912575a..f1eef5c34 100644
        }
  
      if (!done)
-@@ -21461,9 +21493,34 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
+@@ -16925,8 +16957,24 @@ cp_parser_simple_type_specifier (cp_parser* parser,
+ 		{
+ 		  type = error_mark_node;
+ 		  if (!cp_parser_simulate_error (parser))
+-		    cp_parser_name_lookup_error (parser, name, tmpl,
+-						 NLE_TYPE, token->location);
++                    {
++                      /* If we are really about to create an error check optional type for lambda parameters */
++                      if (token->type == CPP_NAME
++                          && !cp_lexer_next_token_is (parser->lexer, CPP_NAME)
++                          && !processing_template_parmlist
++                          && current_class_type
++                          && LAMBDA_TYPE_P (current_class_type)
++                          && !lambda_function (current_class_type))
++                        {
++                          type = synthesize_implicit_template_parm (parser, NULL_TREE);
++                          type = TREE_TYPE (type);
++                          /* reset the parameter name token into the stream */
++                          parser->lexer->next_token = token;
++                        }
++                      else
++                        cp_parser_name_lookup_error (parser, name, tmpl,
++                                                     NLE_TYPE, token->location);
++                    }
+ 		}
+ 	    }
+ 	  else
+@@ -19492,10 +19540,10 @@ cp_parser_declarator (cp_parser* parser,
+ 		      cp_parser_declarator_kind dcl_kind,
+ 		      int* ctor_dtor_or_conv_p,
+ 		      bool* parenthesized_p,
+-		      bool member_p, bool friend_p)
++		      bool member_p, bool friend_p,
++		      enum tree_code code)
+ {
+   cp_declarator *declarator;
+-  enum tree_code code;
+   cp_cv_quals cv_quals;
+   tree class_type;
+   tree gnu_attributes = NULL_TREE, std_attributes = NULL_TREE;
+@@ -19514,7 +19562,8 @@ cp_parser_declarator (cp_parser* parser,
+   code = cp_parser_ptr_operator (parser,
+ 				 &class_type,
+ 				 &cv_quals,
+-				 &std_attributes);
++				 &std_attributes,
++				 code);
+ 
+   /* If that worked, then we have a ptr-operator.  */
+   if (cp_parser_parse_definitely (parser))
+@@ -20145,33 +20194,38 @@ static enum tree_code
+ cp_parser_ptr_operator (cp_parser* parser,
+ 			tree* type,
+ 			cp_cv_quals *cv_quals,
+-			tree *attributes)
++			tree *attributes,
++                        enum tree_code code)
+ {
+-  enum tree_code code = ERROR_MARK;
+   cp_token *token;
+   tree attrs = NULL_TREE;
++  bool code_received = (code != ERROR_MARK);
+ 
+   /* Assume that it's not a pointer-to-member.  */
+   *type = NULL_TREE;
+   /* And that there are no cv-qualifiers.  */
+   *cv_quals = TYPE_UNQUALIFIED;
+ 
+-  /* Peek at the next token.  */
+-  token = cp_lexer_peek_token (parser->lexer);
++  if (!code_received)
++    {
++      /* Peek at the next token.  */
++      token = cp_lexer_peek_token (parser->lexer);
+ 
+-  /* If it's a `*', `&' or `&&' we have a pointer or reference.  */
+-  if (token->type == CPP_MULT)
+-    code = INDIRECT_REF;
+-  else if (token->type == CPP_AND)
+-    code = ADDR_EXPR;
+-  else if ((cxx_dialect != cxx98) &&
+-	   token->type == CPP_AND_AND) /* C++0x only */
+-    code = NON_LVALUE_EXPR;
++      /* If it's a `*', `&' or `&&' we have a pointer or reference.  */
++      if (token->type == CPP_MULT)
++        code = INDIRECT_REF;
++      else if (token->type == CPP_AND)
++        code = ADDR_EXPR;
++      else if ((cxx_dialect != cxx98) &&
++               token->type == CPP_AND_AND) /* C++0x only */
++        code = NON_LVALUE_EXPR;
++    }
+ 
+   if (code != ERROR_MARK)
+     {
+-      /* Consume the `*', `&' or `&&'.  */
+-      cp_lexer_consume_token (parser->lexer);
++      if (!code_received)
++        /* Consume the `*', `&' or `&&'.  */
++        cp_lexer_consume_token (parser->lexer);
+ 
+       /* A `*' can be followed by a cv-qualifier-seq, and so can a
+ 	 `&', if we are allowing GNU extensions.  (The only qualifier
+@@ -21193,9 +21247,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+   cp_decl_specifier_seq decl_specifiers;
+   cp_declarator *declarator;
+   tree default_argument;
+-  cp_token *token = NULL, *declarator_token_start = NULL;
++  cp_token *token = NULL, *declarator_token_start = NULL, *save_token = NULL;
+   const char *saved_message;
+   bool template_parameter_pack_p = false;
++  bool lambda_param_without_type = false;
+ 
+   /* In a template parameter, `>' is not an operator.
+ 
+@@ -21211,6 +21266,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
+   parser->type_definition_forbidden_message
+     = G_("types may not be defined in parameter types");
+ 
++  save_token = cp_lexer_peek_token (parser->lexer);
+   /* Parse the declaration-specifiers.  */
+   cp_parser_decl_specifier_seq (parser,
+ 				CP_PARSER_FLAGS_NONE,
+@@ -21233,6 +21289,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+   /* Peek at the next token.  */
+   token = cp_lexer_peek_token (parser->lexer);
+ 
++  /* We assume that if the token is still the same
++     it's because we found an type-less lambda parameter */
++  if (save_token == token)
++    lambda_param_without_type = true;
+   /* If the next token is a `)', `,', `=', `>', or `...', then there
+      is no declarator. However, when variadic templates are enabled,
+      there may be a declarator following `...'.  */
+@@ -21275,7 +21335,8 @@ cp_parser_parameter_declaration (cp_parser *parser,
+ 					 /*ctor_dtor_or_conv_p=*/NULL,
+ 					 parenthesized_p,
+ 					 /*member_p=*/false,
+-					 /*friend_p=*/false);
++					 /*friend_p=*/false,
++                                         /*code=*/(lambda_param_without_type ? NON_LVALUE_EXPR : ERROR_MARK));
+       parser->default_arg_ok_p = saved_default_arg_ok_p;
+       /* After the declarator, allow more attributes.  */
+       decl_specifiers.attributes
+@@ -21461,9 +21522,41 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
  static void
  cp_parser_function_body (cp_parser *parser, bool in_function_try_block)
  {
@@ -171,6 +331,13 @@ index 9c912575a..f1eef5c34 100644
 +          if (type != error_mark_node)
 +            apply_deduced_return_type (fco, type);
 +        }
++      if (false) //doesn't provide throw() or noexcept() spec
++        {
++          tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
++          tree raises = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
++          TREE_TYPE (fco) = build_exception_variant (TREE_TYPE (fco), raises);
++          TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fco)) = raises;
++        }
 +      finish_return_stmt (expr);
 +      finish_compound_stmt (compound_stmt);
 +    }
@@ -181,7 +348,7 @@ index 9c912575a..f1eef5c34 100644
  }
  
  /* Parse a ctor-initializer-opt followed by a function-body.  Return
-@@ -28066,7 +28123,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+@@ -28066,7 +28159,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
  	  || token->keyword == RID_TRANSACTION_ATOMIC
  	  || token->keyword == RID_TRANSACTION_RELAXED
  	  /* The named return value extension begins with `return'.  */
