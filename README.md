@@ -1,4 +1,4 @@
-# gcc-abbreviated-cpp-lambda
+# gcc-abbreviated-cpp-lambdal
 
 ## Description
 A patch for gcc-7.2 (7.1 in branch) to implement abbreviated lambdas to C++
@@ -7,11 +7,14 @@ The patch aims at implementing the proposals:
 * Abbreviated Lambdas for Fun and Profit: [P0573r1](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0573r1.html)
 * Forward without forward: [P0644r0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0644r0.html)
 
+*PS: The patch implements, for now, unpublished revisions of those proposals.
+The links will be changed once said revisions are published*.
+
 ## Implementation status:
-* adds an abbreviated sytax for lambdas and function [OK]
-* uses decltype\(\(ret_expr\)\) as deduced return type when used [OK]
-* uses noexcept(noexcept(ret_expr)) as deduced exception specification [KO]
-* optional type for lambda's arguments [OK]
+* adds an abbreviated syntax for lambdas and function [OK]
+* uses *decltype\(\(ret_expr\)\)* as deduced return type when used [OK]
+* uses *noexcept(noexcept(ret_expr))* as deduced exception specification [KO]
+* optional type for lambda's arguments [OK~]
 
 ## Example
 ```c++
