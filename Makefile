@@ -2,7 +2,8 @@ RED=\033[0;31m
 NC=\033[0m
 ROOT=$(PWD)/gcc/
 GCC=$(ROOT)/gcc-7.2.0/
-NPROC=$(nproc --all)
+# NPROC=$(nproc --all)
+NPROC=4
 
 all: rebuild test
 

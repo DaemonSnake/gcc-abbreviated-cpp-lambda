@@ -1,4 +1,4 @@
-From 41d70fff080a2dd5604ab613a304b8b85519af02 Mon Sep 17 00:00:00 2001
+From 8d033bc7c8efbae9be2be36ab6360cebe0e33519 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Wed, 16 Aug 2017 21:26:41 +0200
 Subject: [PATCH 2/2] abbreviated lambda without solving fowarding
@@ -23,13 +23,12 @@ It doesn't yet:
 
 Signed-off-by: Bastien Penavayre <bastienPenava@gmail.com>
 ---
- gcc/cp/parser.c         | 201 +++++++++++++++++++++++++++++++++++-------------
- libcpp/include/cpplib.h |   3 +-
- libcpp/lex.c            |   9 ++-
- 3 files changed, 158 insertions(+), 55 deletions(-)
+ gcc/cp/parser.c | 217 +++++++++++++++++++++++++++++++++++++++++---------------
+ libcpp/lex.c    |   2 +-
+ 2 files changed, 160 insertions(+), 59 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 9c912575a..243dc46e5 100644
+index 9c912575a..8012fb418 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -2209,11 +2209,11 @@ static tree cp_parser_init_declarator
@@ -46,6 +45,15 @@ index 9c912575a..243dc46e5 100644
  static cp_cv_quals cp_parser_cv_qualifier_seq_opt
    (cp_parser *);
  static cp_virt_specifiers cp_parser_virt_specifier_seq_opt
+@@ -2557,7 +2557,7 @@ static cp_token *cp_parser_require
+ static cp_token *cp_parser_require_keyword
+   (cp_parser *, enum rid, required_token);
+ static bool cp_parser_token_starts_function_definition_p
+-  (cp_token *);
++  (cp_lexer *, cp_token * = NULL);
+ static bool cp_parser_next_token_starts_class_definition_p
+   (cp_parser *);
+ static bool cp_parser_next_token_ends_template_argument_p
 @@ -10378,6 +10378,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      tree fco = lambda_function (lambda_expr);
      tree body;
@@ -54,13 +62,15 @@ index 9c912575a..243dc46e5 100644
      tree compound_stmt;
      tree cap;
  
-@@ -10390,7 +10391,12 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10390,7 +10391,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      start_lambda_scope (fco);
      body = begin_function_body ();
  
 -    if (!cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE))
-+    if (cp_lexer_next_token_is (parser->lexer, CPP_EQ_GREATER))
++    if (cp_lexer_next_token_is (parser->lexer, CPP_EQ)
++        && cp_lexer_nth_token_is (parser->lexer, 2, CPP_GREATER))
 +      {
++        cp_lexer_consume_token (parser->lexer);
 +        cp_lexer_consume_token (parser->lexer);
 +        is_abriviated = true;
 +      }
@@ -68,7 +78,7 @@ index 9c912575a..243dc46e5 100644
        goto out;
  
      /* Push the proxies for any explicit captures.  */
-@@ -10415,39 +10421,65 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10415,39 +10423,65 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
         nor a deducible form, errors should be reported for return statements
         in the body.  Since we used void as the placeholder return type, parsing
         the body as usual will give such desired behavior.  */
@@ -86,19 +96,22 @@ index 9c912575a..243dc46e5 100644
 -	/* Parse tentatively in case there's more after the initial return
 -	   statement.  */
 -	cp_parser_parse_tentatively (parser);
--
--	cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
--
--	expr = cp_parser_expression (parser, &idk);
 +        if (!is_abriviated)
 +          {
 +            /* Parse tentatively in case there's more after the initial return
 +               statement.  */
 +            cp_parser_parse_tentatively (parser);
  
+-	cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
++            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
+ 
+-	expr = cp_parser_expression (parser, &idk);
++            expr = cp_parser_expression (parser, &idk);
+ 
 -	cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
 -	cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
-+            cp_parser_require_keyword (parser, RID_RETURN, RT_RETURN);
++            cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
++            cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
  
 -	if (cp_parser_parse_definitely (parser))
 -	  {
@@ -109,13 +122,10 @@ index 9c912575a..243dc46e5 100644
 -		if (type == error_mark_node)
 -		  expr = error_mark_node;
 -	      }
-+            expr = cp_parser_expression (parser, &idk);
- 
+-
 -	    /* Will get error here if type not deduced yet.  */
 -	    finish_return_stmt (expr);
-+            cp_parser_require (parser, CPP_SEMICOLON, RT_SEMICOLON);
-+            cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
- 
+-
 -	    done = true;
 -	  }
 +            if (cp_parser_parse_definitely (parser))
@@ -159,7 +169,7 @@ index 9c912575a..243dc46e5 100644
        }
  
      if (!done)
-@@ -16925,8 +16957,24 @@ cp_parser_simple_type_specifier (cp_parser* parser,
+@@ -16925,8 +16959,24 @@ cp_parser_simple_type_specifier (cp_parser* parser,
  		{
  		  type = error_mark_node;
  		  if (!cp_parser_simulate_error (parser))
@@ -186,7 +196,16 @@ index 9c912575a..243dc46e5 100644
  		}
  	    }
  	  else
-@@ -19492,10 +19540,10 @@ cp_parser_declarator (cp_parser* parser,
+@@ -19152,7 +19202,7 @@ cp_parser_init_declarator (cp_parser* parser,
+ 
+       /* Check to see if the token indicates the start of a
+ 	 function-definition.  */
+-      if (cp_parser_token_starts_function_definition_p (token))
++      if (cp_parser_token_starts_function_definition_p (parser->lexer, token))
+ 	{
+ 	  if (!function_definition_allowed_p)
+ 	    {
+@@ -19492,10 +19542,10 @@ cp_parser_declarator (cp_parser* parser,
  		      cp_parser_declarator_kind dcl_kind,
  		      int* ctor_dtor_or_conv_p,
  		      bool* parenthesized_p,
@@ -199,7 +218,7 @@ index 9c912575a..243dc46e5 100644
    cp_cv_quals cv_quals;
    tree class_type;
    tree gnu_attributes = NULL_TREE, std_attributes = NULL_TREE;
-@@ -19514,7 +19562,8 @@ cp_parser_declarator (cp_parser* parser,
+@@ -19514,7 +19564,8 @@ cp_parser_declarator (cp_parser* parser,
    code = cp_parser_ptr_operator (parser,
  				 &class_type,
  				 &cv_quals,
@@ -209,7 +228,7 @@ index 9c912575a..243dc46e5 100644
  
    /* If that worked, then we have a ptr-operator.  */
    if (cp_parser_parse_definitely (parser))
-@@ -20145,33 +20194,38 @@ static enum tree_code
+@@ -20145,33 +20196,38 @@ static enum tree_code
  cp_parser_ptr_operator (cp_parser* parser,
  			tree* type,
  			cp_cv_quals *cv_quals,
@@ -262,7 +281,7 @@ index 9c912575a..243dc46e5 100644
  
        /* A `*' can be followed by a cv-qualifier-seq, and so can a
  	 `&', if we are allowing GNU extensions.  (The only qualifier
-@@ -21193,9 +21247,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21193,9 +21249,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
    cp_decl_specifier_seq decl_specifiers;
    cp_declarator *declarator;
    tree default_argument;
@@ -274,7 +293,7 @@ index 9c912575a..243dc46e5 100644
  
    /* In a template parameter, `>' is not an operator.
  
-@@ -21211,6 +21266,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21211,6 +21268,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
    parser->type_definition_forbidden_message
      = G_("types may not be defined in parameter types");
  
@@ -282,7 +301,7 @@ index 9c912575a..243dc46e5 100644
    /* Parse the declaration-specifiers.  */
    cp_parser_decl_specifier_seq (parser,
  				CP_PARSER_FLAGS_NONE,
-@@ -21233,6 +21289,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21233,6 +21291,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
    /* Peek at the next token.  */
    token = cp_lexer_peek_token (parser->lexer);
  
@@ -293,7 +312,7 @@ index 9c912575a..243dc46e5 100644
    /* If the next token is a `)', `,', `=', `>', or `...', then there
       is no declarator. However, when variadic templates are enabled,
       there may be a declarator following `...'.  */
-@@ -21275,7 +21335,8 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21275,7 +21337,8 @@ cp_parser_parameter_declaration (cp_parser *parser,
  					 /*ctor_dtor_or_conv_p=*/NULL,
  					 parenthesized_p,
  					 /*member_p=*/false,
@@ -303,7 +322,7 @@ index 9c912575a..243dc46e5 100644
        parser->default_arg_ok_p = saved_default_arg_ok_p;
        /* After the declarator, allow more attributes.  */
        decl_specifiers.attributes
-@@ -21461,9 +21522,41 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
+@@ -21461,9 +21524,43 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
  static void
  cp_parser_function_body (cp_parser *parser, bool in_function_try_block)
  {
@@ -311,8 +330,10 @@ index 9c912575a..243dc46e5 100644
 -					       ? BCS_TRY_BLOCK : BCS_NORMAL),
 -				true);
 +  if (!in_function_try_block
-+      && cp_lexer_next_token_is (parser->lexer, CPP_EQ_GREATER))
++      && cp_lexer_next_token_is (parser->lexer, CPP_EQ)
++      && cp_lexer_nth_token_is (parser->lexer, 2, CPP_GREATER))
 +    {
++      cp_lexer_consume_token (parser->lexer);
 +      cp_lexer_consume_token (parser->lexer);
 +      tree compound_stmt = begin_compound_stmt (0);
 +      cp_id_kind idk = CP_ID_KIND_NONE;
@@ -348,58 +369,60 @@ index 9c912575a..243dc46e5 100644
  }
  
  /* Parse a ctor-initializer-opt followed by a function-body.  Return
-@@ -28066,7 +28159,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+@@ -23395,7 +23492,7 @@ cp_parser_member_declaration (cp_parser* parser)
+ 		 side-effects, so we must not do it unless we are sure
+ 		 that we are looking at a member-declarator.  */
+ 	      if (cp_parser_token_starts_function_definition_p
+-		  (cp_lexer_peek_token (parser->lexer)))
++		  (parser->lexer))
+ 		{
+ 		  /* The grammar does not allow a pure-specifier to be
+ 		     used when a member function is defined.  (It is
+@@ -26904,7 +27001,7 @@ cp_parser_save_member_function_body (cp_parser* parser,
+     {
+       /* If there's a function-body, skip it.  */
+       if (cp_parser_token_starts_function_definition_p
+-	  (cp_lexer_peek_token (parser->lexer)))
++	  (parser->lexer))
+ 	cp_parser_skip_to_end_of_block_or_statement (parser);
+       return error_mark_node;
+     }
+@@ -28053,8 +28150,10 @@ cp_parser_require_keyword (cp_parser* parser,
+    function-definition.  */
+ 
+ static bool
+-cp_parser_token_starts_function_definition_p (cp_token* token)
++cp_parser_token_starts_function_definition_p (cp_lexer *lexer, cp_token* token)
+ {
++  if (token == NULL)
++    token = cp_lexer_peek_token (lexer);
+   return (/* An ordinary function-body begins with an `{'.  */
+ 	  token->type == CPP_OPEN_BRACE
+ 	  /* A ctor-initializer begins with a `:'.  */
+@@ -28066,7 +28165,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
  	  || token->keyword == RID_TRANSACTION_ATOMIC
  	  || token->keyword == RID_TRANSACTION_RELAXED
  	  /* The named return value extension begins with `return'.  */
 -	  || token->keyword == RID_RETURN);
 +	  || token->keyword == RID_RETURN
 +         /* A single assignement-expression return body '=>' */
-+         || token->type == CPP_EQ_GREATER);
++          || (token->type == CPP_EQ && cp_lexer_nth_token_is (lexer, 2, CPP_GREATER)));
  }
  
  /* Returns TRUE iff the next token is the ":" or "{" beginning a class
-diff --git a/libcpp/include/cpplib.h b/libcpp/include/cpplib.h
-index b843992b0..c4cb9697f 100644
---- a/libcpp/include/cpplib.h
-+++ b/libcpp/include/cpplib.h
-@@ -146,7 +146,8 @@ struct _cpp_file;
-   TK(MACRO_ARG,		NONE)	 /* Macro argument.  */			\
-   TK(PRAGMA,		NONE)	 /* Only for deferred pragmas.  */	\
-   TK(PRAGMA_EOL,	NONE)	 /* End-of-line for deferred pragmas.  */ \
--  TK(PADDING,		NONE)	 /* Whitespace for -E.	*/
-+  TK(PADDING,		NONE)	 /* Whitespace for -E.	*/		\
-+  OP(EQ_GREATER,	"=>")
- 
- #define OP(e, s) CPP_ ## e,
- #define TK(e, s) CPP_ ## e,
 diff --git a/libcpp/lex.c b/libcpp/lex.c
-index 9edd2a6af..89044fa5f 100644
+index 9edd2a6af..bf484df78 100644
 --- a/libcpp/lex.c
 +++ b/libcpp/lex.c
-@@ -3047,7 +3047,13 @@ _cpp_lex_direct (cpp_reader *pfile)
-       break;
- 
-     case '*': IF_NEXT_IS ('=', CPP_MULT_EQ, CPP_MULT); break;
--    case '=': IF_NEXT_IS ('=', CPP_EQ_EQ, CPP_EQ); break;
-+    case '=':
-+	result->type = CPP_EQ;
-+	if (*buffer->cur == '=')
-+	    buffer->cur++, result->type = CPP_EQ_EQ;
-+	else if (*buffer->cur == '>')
-+	    buffer->cur++, result->type = CPP_EQ_GREATER;
-+	break;
-     case '!': IF_NEXT_IS ('=', CPP_NOT_EQ, CPP_NOT); break;
-     case '^': IF_NEXT_IS ('=', CPP_XOR_EQ, CPP_XOR); break;
-     case '#': IF_NEXT_IS ('#', CPP_PASTE, CPP_HASH); result->val.token_no = 0; break;
-@@ -3424,6 +3430,7 @@ cpp_avoid_paste (cpp_reader *pfile, const cpp_token *token1,
- 				    || (TOKEN_SPELL (token2) == SPELL_LITERAL
- 					&& ISIDST (token2->val.str.text[0]))));
- 
-+    case CPP_EQ_GREATER: return (a == '=' && b == '>');
-     default:		break;
-     }
- 
+@@ -2950,7 +2950,7 @@ _cpp_lex_direct (cpp_reader *pfile)
+       result->type = CPP_GREATER;
+       if (*buffer->cur == '=')
+ 	buffer->cur++, result->type = CPP_GREATER_EQ;
+-      else if (*buffer->cur == '>')
++      else if (*buffer->cur == '>' && *(buffer->cur + 1) != '>')
+ 	{
+ 	  buffer->cur++;
+ 	  IF_NEXT_IS ('=', CPP_RSHIFT_EQ, CPP_RSHIFT);
 -- 
 2.11.0
 
