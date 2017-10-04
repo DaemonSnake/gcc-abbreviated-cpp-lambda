@@ -11,12 +11,16 @@ The patch aims at implementing the proposals:
 * adds an abbreviated sytax for lambdas and function [OK]
 * uses decltype\(\(ret_expr\)\) as deduced return type when used [OK]
 * uses noexcept(noexcept(ret_expr)) as deduced exception specification [KO]
+* optional type for lambda's arguments [OK]
 
 ## Example
 ```c++
-[](auto&&x) => func(>>x);
+[](auto&&x) => func(>>x); /*or*/ [](x) => func(>>x);
 //will be equivalent to
-[](auto&& x) -> decltype((func(std::forward<decltype(x)&&>(x)))) noexcept(noexcept(func(std::forward<decltype(x)&&>(x)))) {
+[](auto&& x)
+  noexcept(noexcept(func(std::forward<decltype(x)&&>(x))))
+  -> decltype((func(std::forward<decltype(x)&&>(x))))
+{
     return func(std::forward<decltype(x)&&>(x));    
 };
 template<class T>
@@ -47,18 +51,10 @@ By default gcc is configured with the following options:
 Simply remove them from the gcc/build command from Makefile if you want to change the default behavior.
 
 ## Todo/bugs
-* noexcept(noexcept(ret_expr)) is not fully operational, it causes ICEs in certain situations.
+* noexcept(noexcept(ret_expr)) is not functional yet.
 * forward decay-copy capture for lambdas.
 ```c++
 int x;
 [>>]() {};
 //x is perfectly forwarded in the lambda
 ```
-
-## Note on gcc-7.1
-
-The reason why this patch targets gcc-7.2 instead of 7.1 is because the following crashes with gcc-7.1
-```c++
-[](auto&& x) noexcept(noexcept(f(x))) { return f(x); };
-```
-The branch '7.1' therefore doesn't implement the exception specification part of the abbreviated lambda proposal.
