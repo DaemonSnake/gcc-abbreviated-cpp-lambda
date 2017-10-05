@@ -50,10 +50,8 @@ void check_optional_type_for_parameter()
 {
     auto sqrt = [](x) => x * x;
     static_assert(sqrt(42) == 42 * 42);
-    [](x)
-    {
-        static_assert(std::is_rvalue_reference_v<decltype(x)>);
-    }(42);
+    [](x) { static_assert(std::is_rvalue_reference_v<decltype(x)>); }(42);
+    [](x...) { static_assert((is_rvalue_ref(>>x) && ...)); }(42);
 }
 
 template<class T> constexpr auto func_1(T&& x) => (>>x);

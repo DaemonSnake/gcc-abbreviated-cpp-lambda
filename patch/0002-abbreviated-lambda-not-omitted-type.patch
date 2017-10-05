@@ -1,4 +1,4 @@
-From c358217c0f9538e5381456ff0852aafd76131773 Mon Sep 17 00:00:00 2001
+From 59406c3739211abf726c9fef529743c51cebabd0 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Thu, 5 Oct 2017 07:21:11 +0200
 Subject: [PATCH 2/3] abbreviated lambda (not omitted type)
@@ -17,11 +17,11 @@ It doesn't yet:
 * implements the noexcept specification over abbreviated lambdas or functions :
         noexcept(noexcept(return_expr))
 ---
- gcc/cp/parser.c | 142 ++++++++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 107 insertions(+), 35 deletions(-)
+ gcc/cp/parser.c | 145 ++++++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 109 insertions(+), 36 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 9c912575a..4016a4b47 100644
+index 9c912575a..87782b45d 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -2557,7 +2557,7 @@ static cp_token *cp_parser_require
@@ -204,7 +204,17 @@ index 9c912575a..4016a4b47 100644
  }
  
  /* Parse a ctor-initializer-opt followed by a function-body.  Return
-@@ -23395,7 +23463,7 @@ cp_parser_member_declaration (cp_parser* parser)
+@@ -23336,7 +23404,8 @@ cp_parser_member_declaration (cp_parser* parser)
+ 		 its initializer is processed.  However, the rest of the
+ 		 front end does not yet provide an interface that allows
+ 		 us to handle this correctly.  */
+-	      if (cp_lexer_next_token_is (parser->lexer, CPP_EQ))
++	      if (cp_lexer_next_token_is (parser->lexer, CPP_EQ)
++                  && !cp_lexer_nth_token_is (parser->lexer, 2, CPP_GREATER))
+ 		{
+ 		  /* In [class.mem]:
+ 
+@@ -23395,7 +23464,7 @@ cp_parser_member_declaration (cp_parser* parser)
  		 side-effects, so we must not do it unless we are sure
  		 that we are looking at a member-declarator.  */
  	      if (cp_parser_token_starts_function_definition_p
@@ -213,7 +223,7 @@ index 9c912575a..4016a4b47 100644
  		{
  		  /* The grammar does not allow a pure-specifier to be
  		     used when a member function is defined.  (It is
-@@ -26904,7 +26972,7 @@ cp_parser_save_member_function_body (cp_parser* parser,
+@@ -26904,7 +26973,7 @@ cp_parser_save_member_function_body (cp_parser* parser,
      {
        /* If there's a function-body, skip it.  */
        if (cp_parser_token_starts_function_definition_p
@@ -222,7 +232,7 @@ index 9c912575a..4016a4b47 100644
  	cp_parser_skip_to_end_of_block_or_statement (parser);
        return error_mark_node;
      }
-@@ -28053,8 +28121,10 @@ cp_parser_require_keyword (cp_parser* parser,
+@@ -28053,8 +28122,10 @@ cp_parser_require_keyword (cp_parser* parser,
     function-definition.  */
  
  static bool
@@ -234,7 +244,7 @@ index 9c912575a..4016a4b47 100644
    return (/* An ordinary function-body begins with an `{'.  */
  	  token->type == CPP_OPEN_BRACE
  	  /* A ctor-initializer begins with a `:'.  */
-@@ -28066,7 +28136,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+@@ -28066,7 +28137,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
  	  || token->keyword == RID_TRANSACTION_ATOMIC
  	  || token->keyword == RID_TRANSACTION_RELAXED
  	  /* The named return value extension begins with `return'.  */
