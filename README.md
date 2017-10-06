@@ -14,7 +14,7 @@ The links will be changed once said revisions are published*.
 * adds an abbreviated syntax for lambdas and function [OK]
 * uses *decltype\(\(ret_expr\)\)* as deduced return type when used [OK]
 * uses *noexcept(noexcept(ret_expr))* as deduced exception specification [KO]
-* optional type for lambda's arguments [OK~]
+* optional type for lambda's arguments [OK]
 
 ## Example
 ```c++
@@ -29,6 +29,8 @@ The links will be changed once said revisions are published*.
 
 template<class T>
 constexpr auto f(T&& x) => x; //allowed with functions too
+
+[](x...) {}; //same as [](auto&&... x) {}
 ```
 
 ## Try It
@@ -56,9 +58,3 @@ Simply remove them from the gcc/build command from Makefile if you want to chang
 
 ## Todo/bugs
 * noexcept(noexcept(ret_expr)) is not functional yet.
-* variadic parameter with omitted type not functional
-```c++
-[](x...) {};
-//means, for now
-[](auto&& x, ...) {}
-```
