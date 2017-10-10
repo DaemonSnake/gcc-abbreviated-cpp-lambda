@@ -1,21 +1,21 @@
-From 75cd8da261022e2274cfb666195a4a0629f6459a Mon Sep 17 00:00:00 2001
+From 09d28b36cc0022450e8630d7524759c6a886b9db Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
-Date: Thu, 5 Oct 2017 07:23:46 +0200
+Date: Tue, 10 Oct 2017 13:54:54 +0200
 Subject: [PATCH 3/3] omitted lambda argument type
 
 This patch implements optional parameter type for lambdas :
-     '[](x) {}' being equivalent to '[](auto&& x) {}'
-     '[](x...) {}' being equivalent to '[](auto&&... x) {}'
+   '[](x) {}' being equivalent to '[](auto&& x) {}'
+   '[](x...) {}' being equivalent to '[](auto&&... x) {}'
 ---
  gcc/cp/parser.c | 72 ++++++++++++++++++++++++++++++++++++++++++---------------
  gcc/cp/parser.h |  3 +++
  2 files changed, 57 insertions(+), 18 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 87782b45d..8ba575fc9 100644
+index c700926b3..1cee4ae05 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
-@@ -3805,6 +3805,8 @@ cp_parser_new (void)
+@@ -3808,6 +3808,8 @@ cp_parser_new (void)
    /* Allow constrained-type-specifiers. */
    parser->prevent_constrained_type_specifiers = 0;
  
@@ -24,7 +24,7 @@ index 87782b45d..8ba575fc9 100644
    return parser;
  }
  
-@@ -16959,8 +16961,25 @@ cp_parser_simple_type_specifier (cp_parser* parser,
+@@ -16983,8 +16985,25 @@ cp_parser_simple_type_specifier (cp_parser* parser,
  		{
  		  type = error_mark_node;
  		  if (!cp_parser_simulate_error (parser))
@@ -52,7 +52,7 @@ index 87782b45d..8ba575fc9 100644
  		}
  	    }
  	  else
-@@ -20184,28 +20203,36 @@ cp_parser_ptr_operator (cp_parser* parser,
+@@ -20218,28 +20237,36 @@ cp_parser_ptr_operator (cp_parser* parser,
    enum tree_code code = ERROR_MARK;
    cp_token *token;
    tree attrs = NULL_TREE;
@@ -100,7 +100,7 @@ index 87782b45d..8ba575fc9 100644
  
        /* A `*' can be followed by a cv-qualifier-seq, and so can a
  	 `&', if we are allowing GNU extensions.  (The only qualifier
-@@ -21230,6 +21257,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21264,6 +21291,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
    cp_token *token = NULL, *declarator_token_start = NULL;
    const char *saved_message;
    bool template_parameter_pack_p = false;
@@ -108,7 +108,7 @@ index 87782b45d..8ba575fc9 100644
  
    /* In a template parameter, `>' is not an operator.
  
-@@ -21251,6 +21279,9 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21285,6 +21313,9 @@ cp_parser_parameter_declaration (cp_parser *parser,
  				&decl_specifiers,
  				&declares_class_or_enum);
  
@@ -118,7 +118,7 @@ index 87782b45d..8ba575fc9 100644
    /* Complain about missing 'typename' or other invalid type names.  */
    if (!decl_specifiers.any_type_specifiers_p
        && cp_parser_parse_and_diagnose_invalid_type_name (parser))
-@@ -21326,6 +21357,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21360,6 +21391,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
  	}
      }
  
@@ -129,7 +129,7 @@ index 87782b45d..8ba575fc9 100644
    /* If the next token is an ellipsis, and we have not seen a declarator
       name, and if either the type of the declarator contains parameter
       packs but it is not a TYPE_PACK_EXPANSION or is null (this happens
-@@ -21340,11 +21375,12 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21374,11 +21409,12 @@ cp_parser_parameter_declaration (cp_parser *parser,
        if (type && DECL_P (type))
          type = TREE_TYPE (type);
  

@@ -4,6 +4,7 @@
 void check_return_type_are_correct();
 void check_forward();
 void check_raii();
+void check_noexcept_spec();
 
 struct Widget {};
 bool test(int) => true;
@@ -26,6 +27,7 @@ int main()
     check_raii();
     check_forward();
     check_return_type_are_correct();
+    check_noexcept_spec();
 }
 
 void check_raii()
@@ -97,4 +99,13 @@ void check_return_type_are_correct()
     SAME_F(func_3, func_4, v);
     SAME_F(func_3, func_4, >>i);
     SAME_F(func_3, func_4, >>v);
+}
+
+void check_noexcept_spec()
+{
+    auto excepts = []<class T>(T&&) noexcept(false) { throw 42; };
+    auto doesnt_excepts = []<class T>(T&&) noexcept(true) {};
+    constexpr auto test = []<class T>(T&& lambda, auto&&... args) => lambda(>>args...);
+    static_assert(noexcept(test(excepts, 42)) == false);
+    static_assert(noexcept(test(doesnt_excepts, 42)) == true);
 }
