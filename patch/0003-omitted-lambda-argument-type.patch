@@ -1,4 +1,4 @@
-From 09d28b36cc0022450e8630d7524759c6a886b9db Mon Sep 17 00:00:00 2001
+From 767418b82d893fdef03f699ce324950acc2cc883 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Tue, 10 Oct 2017 13:54:54 +0200
 Subject: [PATCH 3/3] omitted lambda argument type
@@ -12,7 +12,7 @@ This patch implements optional parameter type for lambdas :
  2 files changed, 57 insertions(+), 18 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index c700926b3..1cee4ae05 100644
+index 46102fc6a..63cb06982 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -3808,6 +3808,8 @@ cp_parser_new (void)
