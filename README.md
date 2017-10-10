@@ -10,10 +10,16 @@ The patch aims at implementing the proposals:
 *PS: The patch implements, for now, unpublished revisions of those proposals.
 The links will be changed once said revisions are published*.
 
+## Try It
+
+You can try the compiler live [here](http://www.gcc-abbreviated-lambdas-proposal.tk/).
+
+I'm hosting a ubuntu build of the compiler on a Amazon EC2 server and running [compiler explorer](https://github.com/mattgodbolt/compiler-explorer) on it.
+
 ## Implementation status:
-* adds an abbreviated syntax for lambdas and function [OK]
+* adds an abbreviated syntax for lambdas and function/members [OK]
 * uses *decltype\(\(ret_expr\)\)* as deduced return type when used [OK]
-* uses *noexcept(noexcept(ret_expr))* as deduced exception specification [KO]
+* uses *noexcept(noexcept(ret_expr))* as deduced exception specification [OK]
 * optional type for lambda's arguments [OK]
 
 ## Example
@@ -33,12 +39,6 @@ constexpr auto f(T&& x) => x; //allowed with functions too
 [](x...) {}; //same as [](auto&&... x) {}
 ```
 
-## Try It
-
-You can try the compiler live [here](http://www.gcc-abbreviated-lambdas-proposal.tk/).
-
-I'm hosting a ubuntu build of the compiler on a Amazon EC2 server and running [compiler explorer](https://github.com/mattgodbolt/compiler-explorer) on it.
-
 ## How to use localy
 
 Simply run make, sit back and wait.
@@ -50,11 +50,8 @@ It will:
 * install gcc in $(PWD)/gcc/install/
 * compile test.cpp with the new g++.
 
-By default gcc is configured with the following options:
+By default gcc will be configured with the following options:
 * --disable-bootstrap //build gcc using the produced gcc
 * --disable-multilib //cross-compiling
 * --disable-shared //doesn't build shared standard library
 Simply remove them from the gcc/build command from Makefile if you want to change the default behavior.
-
-## Todo/bugs
-* noexcept(noexcept(ret_expr)) is not functional yet.
