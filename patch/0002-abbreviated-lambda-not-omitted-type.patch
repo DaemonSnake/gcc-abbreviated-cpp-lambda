@@ -1,4 +1,4 @@
-From 423bdba71c7013f029bfd86ca5eabbf16ca1e00a Mon Sep 17 00:00:00 2001
+From 190e011d2b13d5ab0d92fdd980856ccf2d77d4ec Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Tue, 10 Oct 2017 14:15:50 +0200
 Subject: [PATCH 2/3] abbreviated lambda (not omitted type)
@@ -14,18 +14,18 @@ This patch adds the following:
 * implements the noexcept specification over abbreviated lambdas or functions :
         noexcept(noexcept(return_expr))
 ---
- gcc/cp/parser.c | 126 ++++++++++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 114 insertions(+), 12 deletions(-)
+ gcc/cp/parser.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 114 insertions(+), 20 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 9c912575a..46102fc6a 100644
+index 9c912575a..4db5b1f65 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -260,6 +260,9 @@ static tree cp_parser_cilk_simd_vectorlength
  static void cp_finalize_oacc_routine
    (cp_parser *, tree, bool);
  
-+static void cp_parser_try_abbreviated_function_block
++static bool cp_parser_try_abbreviated_function_block_specifications
 +  (cp_parser *, tree &, tree &);
 +
  /* Manifest constants.  */
@@ -40,23 +40,24 @@ index 9c912575a..46102fc6a 100644
  static bool cp_parser_next_token_starts_class_definition_p
    (cp_parser *);
  static bool cp_parser_next_token_ends_template_argument_p
-@@ -10163,6 +10166,39 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
+@@ -10163,6 +10166,37 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
    cp_parser_require (parser, CPP_CLOSE_SQUARE, RT_CLOSE_SQUARE);
  }
  
-+static void
-+cp_parser_try_abbreviated_function_block (cp_parser *parser, tree &return_spec, tree &exception_spec)
++static bool
++cp_parser_try_abbreviated_function_block_specifications (cp_parser *parser, tree &return_spec, tree &exception_spec)
 +{
 +  tree expr;
 +  cp_id_kind idk = CP_ID_KIND_NONE;
 +
-+  if ((parser->prevent_constrained_type_specifiers
-+       || return_spec != NULL_TREE)
-+      && exception_spec)
-+    return ;
 +  if (!cp_lexer_next_token_is (parser->lexer, CPP_EQ)
 +      || !cp_lexer_nth_token_is (parser->lexer, 2, CPP_GREATER))
-+    return ;
++    return false;
++  if (return_spec != NULL_TREE && exception_spec != NULL_TREE)
++    {
++      cp_parser_error (parser, "functions of the abbreviated form can't have explicit return and exception specifications");
++      return false;
++    }
 +
 +  cp_lexer_save_tokens (parser->lexer);
 +  cp_lexer_consume_token (parser->lexer);
@@ -66,41 +67,59 @@ index 9c912575a..46102fc6a 100644
 +  --cp_unevaluated_operand;
 +  cp_lexer_rollback_tokens (parser->lexer);
 +
-+  if (!return_spec && !parser->prevent_constrained_type_specifiers)
-+    return_spec = finish_decltype_type(expr,
-+                                       /*id_expression_or_member_access_p*/false,
-+                                       tf_warning_or_error);
-+  if (!exception_spec)
-+    {
-+      tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
-+      exception_spec = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
-+    }
++  return_spec = finish_decltype_type(expr,
++                                     /*id_expression_or_member_access_p*/false,
++                                     tf_warning_or_error);
++  tree noexcept_expr = finish_noexcept_expr (expr, tf_warning_or_error);
++  exception_spec = build_noexcept_spec (noexcept_expr, tf_warning_or_error);
++  return true;
 +}
 +
  /* Parse the (optional) middle of a lambda expression.
  
     lambda-declarator:
-@@ -10265,12 +10301,19 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
- 	    = cp_parser_trailing_type_id (parser);
+@@ -10254,15 +10288,21 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
+ 
+       tx_qual = cp_parser_tx_qualifier_opt (parser);
+ 
+-      /* Parse optional exception specification.  */
+-      exception_spec = cp_parser_exception_specification_opt (parser);
+-
+-      /* Parse optional trailing return type.  */
+-      if (cp_lexer_next_token_is (parser->lexer, CPP_DEREF))
++      if (!cp_parser_try_abbreviated_function_block_specifications
++          (parser,
++           LAMBDA_EXPR_RETURN_TYPE (lambda_expr),
++           exception_spec))
+         {
+-          cp_lexer_consume_token (parser->lexer);
+-          LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
+-	    = cp_parser_trailing_type_id (parser);
++          /* Parse optional exception specification.  */
++          exception_spec = cp_parser_exception_specification_opt (parser);
++
++          /* Parse optional trailing return type.  */
++          if (cp_lexer_next_token_is (parser->lexer, CPP_DEREF))
++            {
++              cp_lexer_consume_token (parser->lexer);
++              LAMBDA_EXPR_RETURN_TYPE (lambda_expr)
++                  = cp_parser_trailing_type_id (parser);
++            }
          }
  
-+      cp_parser_try_abbreviated_function_block (parser,
-+                                                LAMBDA_EXPR_RETURN_TYPE (lambda_expr),
-+                                                exception_spec);
        /* The function parameters must be in scope all the way until after the
-          trailing-return-type in case of decltype.  */
-       pop_bindings_and_leave_scope ();
+@@ -10271,6 +10311,10 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
      }
    else if (template_param_list != NULL_TREE) // generate diagnostic
      cp_parser_require (parser, CPP_OPEN_PAREN, RT_OPEN_PAREN);
 +  else /* might have [] => assigment_expression */
-+    cp_parser_try_abbreviated_function_block (parser,
++    cp_parser_try_abbreviated_function_block_specifications (parser,
 +                                              LAMBDA_EXPR_RETURN_TYPE (lambda_expr),
 +                                              exception_spec);
  
    /* Create the function call operator.
  
-@@ -10378,6 +10421,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10378,6 +10422,7 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      tree fco = lambda_function (lambda_expr);
      tree body;
      bool done = false;
@@ -108,7 +127,7 @@ index 9c912575a..46102fc6a 100644
      tree compound_stmt;
      tree cap;
  
-@@ -10390,7 +10434,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10390,7 +10435,14 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      start_lambda_scope (fco);
      body = begin_function_body ();
  
@@ -124,7 +143,7 @@ index 9c912575a..46102fc6a 100644
        goto out;
  
      /* Push the proxies for any explicit captures.  */
-@@ -10449,6 +10500,13 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
+@@ -10449,6 +10501,13 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
  	    done = true;
  	  }
        }
@@ -138,26 +157,15 @@ index 9c912575a..46102fc6a 100644
  
      if (!done)
        {
-@@ -19073,12 +19131,18 @@ cp_parser_init_declarator (cp_parser* parser,
- 
-   token = cp_lexer_peek_token (parser->lexer);
- 
-+  if (!type_uses_auto (decl_specifiers->type))
-+    parser->prevent_constrained_type_specifiers = true;
-+
-   /* Parse the declarator.  */
-   declarator
-     = cp_parser_declarator (parser, CP_PARSER_DECLARATOR_NAMED,
+@@ -19079,6 +19138,7 @@ cp_parser_init_declarator (cp_parser* parser,
  			    &ctor_dtor_or_conv_p,
  			    /*parenthesized_p=*/NULL,
  			    member_p, friend_p);
 +
-+  parser->prevent_constrained_type_specifiers = false;
-+
    /* Gather up the deferred checks.  */
    stop_deferring_access_checks ();
  
-@@ -19152,7 +19216,7 @@ cp_parser_init_declarator (cp_parser* parser,
+@@ -19152,7 +19212,7 @@ cp_parser_init_declarator (cp_parser* parser,
  
        /* Check to see if the token indicates the start of a
  	 function-definition.  */
@@ -166,18 +174,18 @@ index 9c912575a..46102fc6a 100644
  	{
  	  if (!function_definition_allowed_p)
  	    {
-@@ -19734,6 +19798,10 @@ cp_parser_direct_declarator (cp_parser* parser,
+@@ -19734,6 +19794,10 @@ cp_parser_direct_declarator (cp_parser* parser,
  				 (parser, declarator, requires_clause,
  				  memfn ? cv_quals : -1));
  
-+                  cp_parser_try_abbreviated_function_block (parser,
++                  cp_parser_try_abbreviated_function_block_specifications (parser,
 +                                                            late_return,
 +                                                            exception_specification);
 +
  		  /* Parse the virt-specifier-seq.  */
  		  virt_specifiers = cp_parser_virt_specifier_seq_opt (parser);
  
-@@ -21461,9 +21529,23 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
+@@ -21461,9 +21525,23 @@ cp_parser_default_argument (cp_parser *parser, bool template_parm_p)
  static void
  cp_parser_function_body (cp_parser *parser, bool in_function_try_block)
  {
@@ -204,25 +212,7 @@ index 9c912575a..46102fc6a 100644
  }
  
  /* Parse a ctor-initializer-opt followed by a function-body.  Return
-@@ -23289,6 +23371,8 @@ cp_parser_member_declaration (cp_parser* parser)
- 	      tree asm_specification;
- 	      int ctor_dtor_or_conv_p;
- 
-+              if (!type_uses_auto (decl_specifiers.type))
-+                parser->prevent_constrained_type_specifiers = true;
- 	      /* Parse the declarator.  */
- 	      declarator
- 		= cp_parser_declarator (parser, CP_PARSER_DECLARATOR_NAMED,
-@@ -23297,6 +23381,8 @@ cp_parser_member_declaration (cp_parser* parser)
- 					/*member_p=*/true,
- 					friend_p);
- 
-+              parser->prevent_constrained_type_specifiers = false;
-+
- 	      /* If something went wrong parsing the declarator, make sure
- 		 that we at least consume some tokens.  */
- 	      if (declarator == cp_error_declarator)
-@@ -23336,7 +23422,8 @@ cp_parser_member_declaration (cp_parser* parser)
+@@ -23336,7 +23414,8 @@ cp_parser_member_declaration (cp_parser* parser)
  		 its initializer is processed.  However, the rest of the
  		 front end does not yet provide an interface that allows
  		 us to handle this correctly.  */
@@ -232,7 +222,7 @@ index 9c912575a..46102fc6a 100644
  		{
  		  /* In [class.mem]:
  
-@@ -23395,7 +23482,7 @@ cp_parser_member_declaration (cp_parser* parser)
+@@ -23395,7 +23474,7 @@ cp_parser_member_declaration (cp_parser* parser)
  		 side-effects, so we must not do it unless we are sure
  		 that we are looking at a member-declarator.  */
  	      if (cp_parser_token_starts_function_definition_p
@@ -241,7 +231,7 @@ index 9c912575a..46102fc6a 100644
  		{
  		  /* The grammar does not allow a pure-specifier to be
  		     used when a member function is defined.  (It is
-@@ -26904,7 +26991,7 @@ cp_parser_save_member_function_body (cp_parser* parser,
+@@ -26904,7 +26983,7 @@ cp_parser_save_member_function_body (cp_parser* parser,
      {
        /* If there's a function-body, skip it.  */
        if (cp_parser_token_starts_function_definition_p
@@ -250,7 +240,7 @@ index 9c912575a..46102fc6a 100644
  	cp_parser_skip_to_end_of_block_or_statement (parser);
        return error_mark_node;
      }
-@@ -26967,7 +27054,18 @@ cp_parser_save_member_function_body (cp_parser* parser,
+@@ -26967,7 +27046,18 @@ cp_parser_save_member_function_body (cp_parser* parser,
  	    cp_lexer_consume_token (parser->lexer);
  	}
      }
@@ -270,7 +260,7 @@ index 9c912575a..46102fc6a 100644
    /* Handle function try blocks.  */
    if (function_try_block)
      while (cp_lexer_next_token_is_keyword (parser->lexer, RID_CATCH))
-@@ -28053,8 +28151,10 @@ cp_parser_require_keyword (cp_parser* parser,
+@@ -28053,8 +28143,10 @@ cp_parser_require_keyword (cp_parser* parser,
     function-definition.  */
  
  static bool
@@ -282,7 +272,7 @@ index 9c912575a..46102fc6a 100644
    return (/* An ordinary function-body begins with an `{'.  */
  	  token->type == CPP_OPEN_BRACE
  	  /* A ctor-initializer begins with a `:'.  */
-@@ -28066,7 +28166,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
+@@ -28066,7 +28158,9 @@ cp_parser_token_starts_function_definition_p (cp_token* token)
  	  || token->keyword == RID_TRANSACTION_ATOMIC
  	  || token->keyword == RID_TRANSACTION_RELAXED
  	  /* The named return value extension begins with `return'.  */
