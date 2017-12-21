@@ -1,4 +1,4 @@
-From e3ffe2349ec6977f74526c72317eff82dae5571f Mon Sep 17 00:00:00 2001
+From 9a3fbf4f3f242ff410748d435333d1f3a668d949 Mon Sep 17 00:00:00 2001
 From: Bastien Penavayre <bastienPenava@gmail.com>
 Date: Tue, 10 Oct 2017 13:54:54 +0200
 Subject: [PATCH 3/3] omitted lambda argument type
@@ -12,7 +12,7 @@ This patch implements optional parameter type for lambdas :
  2 files changed, 57 insertions(+), 18 deletions(-)
 
 diff --git a/gcc/cp/parser.c b/gcc/cp/parser.c
-index 4db5b1f65..4711bb971 100644
+index 0634b1c10..63b585a12 100644
 --- a/gcc/cp/parser.c
 +++ b/gcc/cp/parser.c
 @@ -3808,6 +3808,8 @@ cp_parser_new (void)
@@ -24,7 +24,7 @@ index 4db5b1f65..4711bb971 100644
    return parser;
  }
  
-@@ -16984,8 +16986,25 @@ cp_parser_simple_type_specifier (cp_parser* parser,
+@@ -16999,8 +17001,25 @@ cp_parser_simple_type_specifier (cp_parser* parser,
  		{
  		  type = error_mark_node;
  		  if (!cp_parser_simulate_error (parser))
@@ -52,7 +52,7 @@ index 4db5b1f65..4711bb971 100644
  		}
  	    }
  	  else
-@@ -20214,28 +20233,36 @@ cp_parser_ptr_operator (cp_parser* parser,
+@@ -20234,28 +20253,36 @@ cp_parser_ptr_operator (cp_parser* parser,
    enum tree_code code = ERROR_MARK;
    cp_token *token;
    tree attrs = NULL_TREE;
@@ -100,7 +100,7 @@ index 4db5b1f65..4711bb971 100644
  
        /* A `*' can be followed by a cv-qualifier-seq, and so can a
  	 `&', if we are allowing GNU extensions.  (The only qualifier
-@@ -21260,6 +21287,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21280,6 +21307,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
    cp_token *token = NULL, *declarator_token_start = NULL;
    const char *saved_message;
    bool template_parameter_pack_p = false;
@@ -108,7 +108,7 @@ index 4db5b1f65..4711bb971 100644
  
    /* In a template parameter, `>' is not an operator.
  
-@@ -21281,6 +21309,9 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21301,6 +21329,9 @@ cp_parser_parameter_declaration (cp_parser *parser,
  				&decl_specifiers,
  				&declares_class_or_enum);
  
@@ -118,7 +118,7 @@ index 4db5b1f65..4711bb971 100644
    /* Complain about missing 'typename' or other invalid type names.  */
    if (!decl_specifiers.any_type_specifiers_p
        && cp_parser_parse_and_diagnose_invalid_type_name (parser))
-@@ -21356,6 +21387,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21376,6 +21407,10 @@ cp_parser_parameter_declaration (cp_parser *parser,
  	}
      }
  
@@ -129,7 +129,7 @@ index 4db5b1f65..4711bb971 100644
    /* If the next token is an ellipsis, and we have not seen a declarator
       name, and if either the type of the declarator contains parameter
       packs but it is not a TYPE_PACK_EXPANSION or is null (this happens
-@@ -21370,11 +21405,12 @@ cp_parser_parameter_declaration (cp_parser *parser,
+@@ -21390,11 +21425,12 @@ cp_parser_parameter_declaration (cp_parser *parser,
        if (type && DECL_P (type))
          type = TREE_TYPE (type);
  
