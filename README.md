@@ -9,7 +9,7 @@ The patch aims at implementing the proposals:
 
 ## Try It
 
-You can try the compiler live [here](http://www.gcc-abbreviated-lambdas-proposal.tk/).
+You can try the compiler live [no longer available].
 
 I'm hosting a ubuntu build of the compiler on a Amazon EC2 server and running [compiler explorer](https://github.com/mattgodbolt/compiler-explorer) on it.
 
